@@ -655,10 +655,10 @@ async function startFetch() {
       S.live[io.ioId] = {
         pacingPeriod: 'PACING_PERIOD_DAILY',
         pacingType:   'PACING_TYPE_EVEN',
-        dailyCap:     currentCap,
+        dailyMaxImpressions: currentCap,
         isDaily:      true,
         fetchError:   null,
-        rawPacing:    { pacingPeriod: 'PACING_PERIOD_DAILY', pacingType: 'PACING_TYPE_EVEN', dailyCap: String(currentCap) }
+        rawPacing:    { pacingPeriod: 'PACING_PERIOD_DAILY', pacingType: 'PACING_TYPE_EVEN', dailyMaxImpressions: String(currentCap) }
       };
       S.accepted[io.ioId] = true;
       log('  demo: dailyCap = ' + fmtN(currentCap) + '  period: DAILY  type: EVEN', 'log-ok');
@@ -681,15 +681,20 @@ async function startFetch() {
           log('  \u2717 ' + errMsg, 'log-err');
         } else {
           const pacing = data.pacing || {};
-          const pacingPeriod = pacing.pacingPeriod || '';   // e.g. PACING_PERIOD_DAILY
-          const pacingType   = pacing.pacingType   || '';   // e.g. PACING_TYPE_EVEN
-          const dailyCap     = parseInt(pacing.dailyCap || '0') || 0;
+          const pacingPeriod = pacing.pacingPeriod || '';
+          const pacingType   = pacing.pacingType   || '';
+          const dailyCap     = parseInt(pacing.dailyMaxImpressions || '0') || 0;
           const isDaily      = pacingPeriod === 'PACING_PERIOD_DAILY';
+
+          // Diagnostic: log raw pacing object for first IO
+          if(i === 0) {
+            log('  [diag] raw pacing: ' + JSON.stringify(pacing), 'log-warn');
+          }
 
           S.live[io.ioId] = {
             pacingPeriod,
             pacingType,
-            dailyCap,
+            dailyMaxImpressions,
             isDaily,
             fetchError: null,
             rawPacing: pacing
@@ -702,6 +707,8 @@ async function startFetch() {
           const typeLabel   = pacingType.replace('PACING_TYPE_','').toLowerCase();
           if(!isDaily) {
             log('  \u26a0 pacing period: ' + periodLabel + ' (not daily \u2014 excluded from push)', 'log-warn');
+          } else if(typeLabel === 'asap') {
+            log('  \u26a0 dailyCap = ' + fmtN(dailyCap) + '  period: ' + periodLabel + '  type: ' + typeLabel + ' (ASAP \u2014 cap may be stored separately)', 'log-warn');
           } else {
             log('  dailyCap = ' + fmtN(dailyCap) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-ok');
           }
@@ -745,7 +752,7 @@ function renderReview() {
 
   sorted.forEach(io => {
     const live         = S.live[io.ioId] || {};
-    const dailyCap     = live.dailyCap !== undefined ? live.dailyCap : null;
+    const dailyCap     = live.dailyMaxImpressions !== undefined ? live.dailyMaxImpressions : null;
     const pacingPeriod = live.pacingPeriod || '';
     const pacingType   = live.pacingType   || '';
     const isDaily      = live.isDaily;
@@ -932,7 +939,7 @@ function renderPushScreen() {
       }
 
       const live       = S.live[io.ioId] || {};
-      const dailyCap   = live.dailyCap !== undefined ? live.dailyCap : null;
+      const dailyCap   = live.dailyMaxImpressions !== undefined ? live.dailyMaxImpressions : null;
       const periodLabel = (live.pacingPeriod||'').replace('PACING_PERIOD_','') || '—';
       const typeLabel   = (live.pacingType||'').replace('PACING_TYPE_','')     || '—';
       const rec        = io.recommended;
@@ -955,8 +962,8 @@ function renderPushScreen() {
       tbody.appendChild(row);
     });
 
-  const increases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyCap !== null && io.recommended > l.dailyCap; }).length;
-  const decreases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyCap !== null && io.recommended < l.dailyCap; }).length;
+  const increases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyMaxImpressions !== null && io.recommended > l.dailyMaxImpressions; }).length;
+  const decreases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyMaxImpressions !== null && io.recommended < l.dailyMaxImpressions; }).length;
 
   document.getElementById('push-summary').innerHTML =
     '<strong>' + accepted.length + ' IO' + (accepted.length!==1?'s':'') + '</strong> ready to push \u2014 ' +
@@ -993,12 +1000,12 @@ async function executePush() {
           pacing: {
             pacingPeriod: rawPacing.pacingPeriod || 'PACING_PERIOD_DAILY',
             pacingType:   rawPacing.pacingType   || 'PACING_TYPE_EVEN',
-            dailyCap:     String(sentDailyCap)
+            dailyMaxImpressions: String(sentDailyCap)
           }
         };
 
         const res = await fetch(
-          'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId + '?updateMask=pacing.dailyCap',
+          'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId + '?updateMask=pacing.dailyMaxImpressions',
           {
             method: 'PATCH',
             headers: { Authorization: 'Bearer ' + S.tok, 'Content-Type': 'application/json' },
@@ -1008,7 +1015,7 @@ async function executePush() {
         const data = await res.json();
 
         if(res.ok) {
-          const confirmedDailyCap = parseInt((data.pacing && data.pacing.dailyCap) || '0') || 0;
+          const confirmedDailyCap = parseInt((data.pacing && data.pacing.dailyMaxImpressions) || '0') || 0;
           const status = confirmedDailyCap === sentDailyCap ? 'OK' : 'MISMATCH';
           logEl.innerHTML += '&nbsp;&nbsp;\u2192 dailyCap = ' + fmtN(sentDailyCap) + ' <span class="pl-ok">\u2713</span><br>';
           receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentDailyCap, confirmedDailyCap, status, error: '' });
@@ -1090,7 +1097,7 @@ function exportAuditCSV() {
   const headers = 'IO_ID,IO_Name,Client,DV360_Advertiser_ID,Yesterday_Imps,Daily_Need,Pacing_Period,Pacing_Type,Current_Daily_Cap,Proposed_Daily_Cap,Delta,Pct_Change,Days_Remaining,Imps_Remaining\n';
   const csv = accepted.map(io => {
     const live    = S.live[io.ioId] || {};
-    const current = live.dailyCap !== undefined && live.dailyCap !== null ? live.dailyCap : '';
+    const current = live.dailyMaxImpressions !== undefined && live.dailyMaxImpressions !== null ? live.dailyMaxImpressions : '';
     const rec     = io.recommended;
     const delta   = current !== '' ? (rec - current) : '';
     const pct     = current && current > 0 && delta !== '' ? (delta/current*100).toFixed(2)+'%' : '';
