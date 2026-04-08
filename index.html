@@ -370,11 +370,12 @@ input[type=text]::placeholder{color:var(--ink4);}
           <thead>
             <tr>
               <th>Insertion Order</th>
-              <th>Advertiser</th>
-              <th>Current Budget</th>
-              <th>Recommended Budget</th>
+              <th>Client</th>
+              <th>Pacing Period</th>
+              <th>Pacing Type</th>
+              <th>Current Daily Cap</th>
+              <th>Proposed Daily Cap</th>
               <th>Delta</th>
-              <th>Direction</th>
             </tr>
           </thead>
           <tbody id="push-review-tbody"></tbody>
@@ -410,8 +411,8 @@ input[type=text]::placeholder{color:var(--ink4);}
             <thead>
               <tr>
                 <th>Insertion Order</th>
-                <th>Advertiser</th>
-                <th>Sent Budget</th>
+                <th>Client</th>
+                <th>Sent Daily Cap</th>
                 <th>DV360 Confirmed</th>
                 <th>Status</th>
                 <th>Error</th>
@@ -647,17 +648,20 @@ async function startFetch() {
     log('> ' + io.ioId + ' — ' + (io.ioName || ''));
 
     if(S.tok === 'DEMO') {
-      // Use yesterday's imps as base with small jitter for realism
-      const base = io.dailyNeed || io.recommended || 5000;
+      // Use dailyNeed as base for current cap, with small jitter
+      const base = io.dailyNeed || io.recommended || 2000;
       const jitter = Math.round((Math.random() * 0.3 - 0.1) * base);
-      const currentTotal = Math.max(0, base + jitter);
+      const currentCap = Math.max(0, base + jitter);
       S.live[io.ioId] = {
-        currentBudget: currentTotal,
-        segments: [{ impressionCount: String(currentTotal), dateRange: { startDate: { year:2026, month:1, day:1 }, endDate: { year:2026, month:12, day:31 } } }],
-        fetchError: null
+        pacingPeriod: 'PACING_PERIOD_DAILY',
+        pacingType:   'PACING_TYPE_EVEN',
+        dailyCap:     currentCap,
+        isDaily:      true,
+        fetchError:   null,
+        rawPacing:    { pacingPeriod: 'PACING_PERIOD_DAILY', pacingType: 'PACING_TYPE_EVEN', dailyCap: String(currentCap) }
       };
       S.accepted[io.ioId] = true;
-      log('  demo: current = ' + fmtN(currentTotal) + ' imps', 'log-ok');
+      log('  demo: dailyCap = ' + fmtN(currentCap) + '  period: DAILY  type: EVEN', 'log-ok');
       await new Promise(r => setTimeout(r, 30));
     } else if(!io.dv360AdvId) {
       S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: 'Missing numeric DV360 Advertiser ID — add dv360_advertiser_id to BQ export' };
@@ -672,36 +676,52 @@ async function startFetch() {
         const data = await res.json();
         if(!res.ok) {
           const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
-          S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: errMsg };
+          S.live[io.ioId] = { fetchError: errMsg };
           S.accepted[io.ioId] = false;
           log('  \u2717 ' + errMsg, 'log-err');
         } else {
-          const budget = data.budget || {};
-          const segments = budget.budgetSegments || [];
-          let totalImps = 0;
-          segments.forEach(seg => {
-            const imp = parseInt(seg.impressionCount || '0') || 0;
-            totalImps += imp;
-          });
+          const pacing = data.pacing || {};
+          const pacingPeriod = pacing.pacingPeriod || '';   // e.g. PACING_PERIOD_DAILY
+          const pacingType   = pacing.pacingType   || '';   // e.g. PACING_TYPE_EVEN
+          const dailyCap     = parseInt(pacing.dailyCap || '0') || 0;
+          const isDaily      = pacingPeriod === 'PACING_PERIOD_DAILY';
+
           S.live[io.ioId] = {
-            currentBudget: totalImps,
-            segments: segments,
+            pacingPeriod,
+            pacingType,
+            dailyCap,
+            isDaily,
             fetchError: null,
-            rawBudget: budget
+            rawPacing: pacing
           };
-          S.accepted[io.ioId] = true;
-          log('  current = ' + fmtN(totalImps) + ' imps  (' + segments.length + ' segment' + (segments.length!==1?'s':'') + ')', 'log-ok');
+
+          // Auto-accept only if pacing period is daily
+          S.accepted[io.ioId] = isDaily;
+
+          const periodLabel = pacingPeriod.replace('PACING_PERIOD_','').toLowerCase();
+          const typeLabel   = pacingType.replace('PACING_TYPE_','').toLowerCase();
+          if(!isDaily) {
+            log('  \u26a0 pacing period: ' + periodLabel + ' (not daily \u2014 excluded from push)', 'log-warn');
+          } else {
+            log('  dailyCap = ' + fmtN(dailyCap) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-ok');
+          }
         }
       } catch(err) {
-        S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: err.message };
+        S.live[io.ioId] = { fetchError: err.message };
         S.accepted[io.ioId] = false;
         log('  \u2717 ' + err.message, 'log-err');
       }
     }
   }
 
+  const fetchResults = Object.values(S.live);
+  const fetchOk      = fetchResults.filter(v => !v.fetchError).length;
+  const fetchNonDaily = fetchResults.filter(v => !v.fetchError && !v.isDaily).length;
+  const fetchErr     = fetchResults.filter(v => v.fetchError).length;
   log('');
-  log('Fetch complete. ' + Object.values(S.live).filter(v=>!v.fetchError).length + ' IOs fetched successfully.', 'log-ok');
+  log('Fetch complete. ' + fetchOk + ' IOs fetched' +
+    (fetchNonDaily > 0 ? ' \u2014 \u26a0 ' + fetchNonDaily + ' excluded (non-daily pacing)' : '') +
+    (fetchErr > 0 ? ' \u2014 \u2717 ' + fetchErr + ' errors' : '') + '.', 'log-ok');
   statEl.textContent = 'Complete';
 
   await new Promise(r => setTimeout(r, 600));
@@ -713,10 +733,10 @@ function renderReview() {
   const container = document.getElementById('review-io-cards');
   container.innerHTML = '';
 
-  // Sort alphabetically by advertiser, then IO name
+  // Sort alphabetically by client name, then IO name
   const sorted = [...S.IOs].sort((a,b) => {
-    const an = (a.advName||a.advId).toLowerCase();
-    const bn = (b.advName||b.advId).toLowerCase();
+    const an = (a.advName||a.dv360AdvId||'').toLowerCase();
+    const bn = (b.advName||b.dv360AdvId||'').toLowerCase();
     if(an !== bn) return an < bn ? -1 : 1;
     return (a.ioName||'').toLowerCase() < (b.ioName||'').toLowerCase() ? -1 : 1;
   });
@@ -724,42 +744,65 @@ function renderReview() {
   let lastAdv = null;
 
   sorted.forEach(io => {
-    const live    = S.live[io.ioId] || {};
-    const current = live.currentBudget;
-    const rec     = io.recommended;
-    const delta   = (current !== null && current !== undefined) ? (rec - current) : null;
-    const pctChg  = (current && current > 0 && delta !== null) ? (delta / current * 100) : null;
-    const accepted = S.accepted[io.ioId];
+    const live         = S.live[io.ioId] || {};
+    const dailyCap     = live.dailyCap !== undefined ? live.dailyCap : null;
+    const pacingPeriod = live.pacingPeriod || '';
+    const pacingType   = live.pacingType   || '';
+    const isDaily      = live.isDaily;
+    const rec          = io.recommended;
+    const delta        = (dailyCap !== null && isDaily) ? (rec - dailyCap) : null;
+    const pctChg       = (dailyCap && dailyCap > 0 && delta !== null) ? (delta / dailyCap * 100) : null;
+    const accepted     = S.accepted[io.ioId];
 
-    if((io.advName||io.advId) !== lastAdv) {
-      lastAdv = io.advName||io.advId;
+    // Friendly labels
+    const periodLabel = pacingPeriod.replace('PACING_PERIOD_','') || '—';
+    const typeLabel   = pacingType.replace('PACING_TYPE_','')     || '—';
+
+    const groupKey = io.advName || io.dv360AdvId || io.ioId;
+    if(groupKey !== lastAdv) {
+      lastAdv = groupKey;
       const hd = document.createElement('div');
       hd.className = 'adv-group-hd';
-      hd.textContent = io.advName || io.advId;
+      hd.textContent = groupKey;
       container.appendChild(hd);
     }
 
-    // Insight
+    // Insight bar
     let insightClass = 'ok', insightText = '';
     if(live.fetchError) {
       insightClass = 'err';
       insightText = '<strong>Fetch Error:</strong> ' + live.fetchError + ' — excluded from push.';
+    } else if(!isDaily) {
+      insightClass = 'warn';
+      insightText = '<strong>Pacing period is ' + periodLabel + ', not DAILY</strong> — this IO is excluded from push. Verify in DV360 before proceeding.';
     } else if(delta === null) {
       insightClass = 'warn';
-      insightText = '<strong>No live data</strong> — cannot compare budgets.';
+      insightText = '<strong>No live pacing data</strong> — cannot compare.';
     } else if(delta > 0) {
-      insightText = '<strong>Increase needed:</strong> recommended budget exceeds current by ' + fmtN(delta) + ' imps (' + (pctChg>=0?'+':'') + pctChg.toFixed(1) + '%).';
+      insightText = '<strong>Cap increase:</strong> proposed daily cap exceeds current by ' + fmtN(delta) + ' imps (' + (pctChg>=0?'+':'') + pctChg.toFixed(1) + '%).';
     } else if(delta < 0) {
       insightClass = 'warn';
-      insightText = '<strong>Decrease:</strong> recommended budget is ' + fmtN(Math.abs(delta)) + ' imps lower than current (' + pctChg.toFixed(1) + '%).';
+      insightText = '<strong>Cap decrease:</strong> proposed daily cap is ' + fmtN(Math.abs(delta)) + ' imps lower than current (' + pctChg.toFixed(1) + '%).';
     } else {
-      insightText = '<strong>No change needed</strong> — current and recommended budgets match.';
+      insightText = '<strong>No change needed</strong> — proposed daily cap matches current.';
     }
 
-    const dirTag = delta === null ? '<span class="tag t-neu">unknown</span>'
-      : delta > 0 ? '<span class="tag t-inc">▲ Increase</span>'
-      : delta < 0 ? '<span class="tag t-dec">▼ Decrease</span>'
+    // Add yesterday vs daily need pacing context
+    if(!live.fetchError && isDaily && io.yesterdayImps > 0 && io.dailyNeed > 0) {
+      insightText += io.yesterdayImps >= io.dailyNeed
+        ? ' &nbsp;<span style="color:var(--emerald);">Yesterday (' + fmtN(io.yesterdayImps) + ') \u2265 daily need (' + fmtN(io.dailyNeed) + ') — on track.</span>'
+        : ' &nbsp;<span style="color:var(--amber);">Yesterday (' + fmtN(io.yesterdayImps) + ') &lt; daily need (' + fmtN(io.dailyNeed) + ') — under-pacing.</span>';
+    }
+
+    const dirTag = !isDaily
+      ? '<span class="tag t-er">\u26a0 Non-Daily Pacing</span>'
+      : delta === null ? '<span class="tag t-neu">unknown</span>'
+      : delta > 0 ? '<span class="tag t-inc">\u25b2 Increase</span>'
+      : delta < 0 ? '<span class="tag t-dec">\u25bc Decrease</span>'
       : '<span class="tag t-neu">= No Change</span>';
+
+    // Toggle disabled for non-daily IOs
+    const toggleDisabled = !isDaily || !!live.fetchError;
 
     const card = document.createElement('div');
     card.className = 'io-card' + (accepted ? '' : ' rejected');
@@ -771,77 +814,66 @@ function renderReview() {
           '<div>' +
             '<div class="io-name">' + (io.ioName || io.ioId) + '</div>' +
             '<div class="io-id">' + io.ioId +
-              (io.startDate ? ' &nbsp;·&nbsp; ' + io.startDate + ' \u2192 ' + (io.endDate||'?') : '') +
-              (io.daysRemaining > 0 ? ' &nbsp;·&nbsp; <strong>' + io.daysRemaining + ' days left</strong>' : '') +
+              (io.startDate ? ' &nbsp;\u00b7&nbsp; ' + io.startDate + ' \u2192 ' + (io.endDate||'?') : '') +
+              (io.daysRemaining > 0 ? ' &nbsp;\u00b7&nbsp; <strong>' + io.daysRemaining + ' days left</strong>' : '') +
             '</div>' +
           '</div>' +
           dirTag +
         '</div>' +
         '<div class="io-hd-right">' +
-          '<div class="toggle-wrap" onclick="toggleIO(\'' + io.ioId + '\')">' +
-            '<span>' + (accepted ? 'Accepted' : 'Rejected') + '</span>' +
-            '<div class="toggle' + (accepted ? ' on' : '') + '" id="toggle-' + io.ioId + '"></div>' +
-          '</div>' +
+          (toggleDisabled
+            ? '<span style="font-family:var(--mono);font-size:10px;color:var(--ink4);">excluded</span>'
+            : '<div class="toggle-wrap" onclick="toggleIO(\'' + io.ioId + '\')">' +
+                '<span>' + (accepted ? 'Accepted' : 'Rejected') + '</span>' +
+                '<div class="toggle' + (accepted ? ' on' : '') + '" id="toggle-' + io.ioId + '"></div>' +
+              '</div>'
+          ) +
         '</div>' +
       '</div>' +
+      // 5-column metrics grid
       '<div class="bud-grid" style="grid-template-columns:repeat(5,1fr);">' +
         '<div class="bud-cell">' +
-          '<div class="bc-label">Yesterday Delivered</div>' +
-          '<div class="bc-val" style="font-size:20px;">' + (io.yesterdayImps > 0 ? fmtN(io.yesterdayImps) : '—') + '</div>' +
-          '<div class="bc-sub">actual imps</div>' +
+          '<div class="bc-label">Pacing Period</div>' +
+          '<div class="bc-val" style="font-size:16px;color:' + (isDaily ? 'var(--emerald)' : 'var(--coral)') + ';">' + periodLabel + '</div>' +
+          '<div class="bc-sub">read-only</div>' +
         '</div>' +
         '<div class="bud-cell">' +
-          '<div class="bc-label">Daily Need</div>' +
-          '<div class="bc-val" style="font-size:20px;">' + (io.dailyNeed > 0 ? fmtN(io.dailyNeed) : '—') + '</div>' +
-          '<div class="bc-sub">to pace in full</div>' +
+          '<div class="bc-label">Pacing Type</div>' +
+          '<div class="bc-val" style="font-size:16px;">' + typeLabel + '</div>' +
+          '<div class="bc-sub">read-only</div>' +
         '</div>' +
         '<div class="bud-cell">' +
-          '<div class="bc-label">Current Budget</div>' +
-          '<div class="bc-val" style="font-size:20px;">' + (current !== null && current !== undefined ? fmtN(current) : '—') + '</div>' +
+          '<div class="bc-label">Current Daily Cap</div>' +
+          '<div class="bc-val" style="font-size:20px;">' + (dailyCap !== null ? fmtN(dailyCap) : '—') + '</div>' +
           '<div class="bc-sub">live from DV360</div>' +
         '</div>' +
         '<div class="bud-cell">' +
-          '<div class="bc-label">Proposed Budget</div>' +
+          '<div class="bc-label">Proposed Daily Cap</div>' +
           '<div class="bc-val" style="font-size:20px;color:var(--ink);">' + fmtN(rec) + '</div>' +
           '<div class="bc-sub">120% of daily need</div>' +
         '</div>' +
         '<div class="bud-cell">' +
-          '<div class="bc-label">Delta vs. Current</div>' +
+          '<div class="bc-label">Delta</div>' +
           '<div class="bc-val" style="font-size:20px;color:' + (delta===null?'var(--ink3)':delta>0?'var(--emerald)':delta<0?'var(--amber)':'var(--ink3)') + '">' +
             (delta === null ? '—' : (delta>=0?'+':'') + fmtN(delta)) +
           '</div>' +
-          '<div class="bc-sub">' + (pctChg !== null ? (pctChg>=0?'+':'') + pctChg.toFixed(1) + '% vs live' : 'impressions') + '</div>' +
+          '<div class="bc-sub">' + (pctChg !== null ? (pctChg>=0?'+':'') + pctChg.toFixed(1) + '% vs current' : '') + '</div>' +
         '</div>' +
       '</div>' +
-      (live.segments && live.segments.length > 1 ?
-        '<div class="io-body">' +
-          '<div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">' +
-            live.segments.length + ' Budget Segments (current)' +
-          '</div>' +
-          '<table class="seg-table">' +
-            '<thead><tr><th>Segment</th><th>Start</th><th>End</th><th>Current Imps</th></tr></thead>' +
-            '<tbody>' +
-              live.segments.map((seg, idx) => {
-                const imp = parseInt(seg.impressionCount||'0')||0;
-                const dr = seg.dateRange || {};
-                const s = dr.startDate ? (dr.startDate.year+'-'+String(dr.startDate.month).padStart(2,'0')+'-'+String(dr.startDate.day).padStart(2,'0')) : '—';
-                const e = dr.endDate   ? (dr.endDate.year+'-'+String(dr.endDate.month).padStart(2,'0')+'-'+String(dr.endDate.day).padStart(2,'0')) : '—';
-                return '<tr><td class="td-neutral">#' + (idx+1) + '</td><td>' + s + '</td><td>' + e + '</td><td class="td-new">' + fmtN(imp) + '</td></tr>';
-              }).join('') +
-            '</tbody>' +
-          '</table>' +
-        '</div>'
-      : '') +
+      // Context row: yesterday + daily need
+      '<div style="display:grid;grid-template-columns:1fr 1fr;background:var(--border);">' +
+        '<div class="bud-cell" style="background:var(--paper2);">' +
+          '<div class="bc-label">Yesterday Delivered</div>' +
+          '<div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);">' + (io.yesterdayImps > 0 ? fmtN(io.yesterdayImps) : '—') + '</div>' +
+        '</div>' +
+        '<div class="bud-cell" style="background:var(--paper2);">' +
+          '<div class="bc-label">Daily Need (to pace in full)</div>' +
+          '<div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--ink);">' + (io.dailyNeed > 0 ? fmtN(io.dailyNeed) : '—') + '</div>' +
+        '</div>' +
+      '</div>' +
       '<div class="insight-bar ' + insightClass + '">' +
         '<div class="ib-dot"></div>' +
-        '<div class="ib-text">' + insightText +
-          (io.yesterdayImps > 0 && io.dailyNeed > 0 ?
-            (io.yesterdayImps >= io.dailyNeed
-              ? ' &nbsp;<span style="color:var(--emerald);">Yesterday (' + fmtN(io.yesterdayImps) + ') \u2265 daily need (' + fmtN(io.dailyNeed) + ') \u2014 pacing on track.</span>'
-              : ' &nbsp;<span style="color:var(--amber);">Yesterday (' + fmtN(io.yesterdayImps) + ') &lt; daily need (' + fmtN(io.dailyNeed) + ') \u2014 under-pacing.</span>'
-            )
-          : '') +
-        '</div>' +
+        '<div class="ib-text">' + insightText + '</div>' +
       '</div>';
 
     container.appendChild(card);
@@ -886,31 +918,25 @@ function renderPushScreen() {
 
   const accepted = S.IOs.filter(io => S.accepted[io.ioId]);
 
-  // Group by advertiser
-  const byAdv = {};
-  accepted.forEach(io => {
-    const key = io.advName || io.advId;
-    if(!byAdv[key]) byAdv[key] = [];
-    byAdv[key].push(io);
-  });
-
   let lastAdv = null;
   accepted
-    .sort((a,b) => ((a.advName||a.advId) < (b.advName||b.advId) ? -1 : 1))
+    .sort((a,b) => ((a.advName||a.dv360AdvId||'') < (b.advName||b.dv360AdvId||'') ? -1 : 1))
     .forEach(io => {
-      const advLabel = io.advName || io.advId;
+      const advLabel = io.advName || io.dv360AdvId || io.ioId;
       if(advLabel !== lastAdv) {
         lastAdv = advLabel;
         const row = document.createElement('tr');
         row.className = 'adv-group-row';
-        row.innerHTML = '<td colspan="6">' + advLabel + ' &nbsp;<span style="color:var(--ink3)">' + io.advId + '</span></td>';
+        row.innerHTML = '<td colspan="7">' + advLabel + ' &nbsp;<span style="color:var(--ink3)">' + (io.dv360AdvId||'') + '</span></td>';
         tbody.appendChild(row);
       }
 
-      const live    = S.live[io.ioId] || {};
-      const current = live.currentBudget;
-      const rec     = io.recommended;
-      const delta   = current !== null && current !== undefined ? (rec - current) : null;
+      const live       = S.live[io.ioId] || {};
+      const dailyCap   = live.dailyCap !== undefined ? live.dailyCap : null;
+      const periodLabel = (live.pacingPeriod||'').replace('PACING_PERIOD_','') || '—';
+      const typeLabel   = (live.pacingType||'').replace('PACING_TYPE_','')     || '—';
+      const rec        = io.recommended;
+      const delta      = dailyCap !== null ? (rec - dailyCap) : null;
 
       const row = document.createElement('tr');
       row.innerHTML =
@@ -918,29 +944,24 @@ function renderPushScreen() {
           '<div style="color:var(--ink);font-weight:600;">' + (io.ioName||io.ioId) + '</div>' +
           '<div style="color:var(--ink3);font-size:9px;margin-top:2px;">' + io.ioId + '</div>' +
         '</td>' +
-        '<td style="color:var(--ink2);">' + (io.advName||io.advId) + '</td>' +
-        '<td>' + (current !== null && current !== undefined ? fmtN(current) : '—') + '</td>' +
+        '<td style="color:var(--ink2);">' + (io.advName||io.dv360AdvId||'') + '</td>' +
+        '<td><span class="tag t-ok">' + periodLabel + '</span></td>' +
+        '<td><span class="tag t-neu">' + typeLabel + '</span></td>' +
+        '<td>' + (dailyCap !== null ? fmtN(dailyCap) : '—') + '</td>' +
         '<td style="color:var(--ink);font-weight:600;">' + fmtN(rec) + '</td>' +
         '<td style="color:' + (delta===null?'var(--ink3)':delta>0?'var(--emerald)':delta<0?'var(--amber)':'var(--ink3)') + ';font-weight:600;">' +
           (delta===null?'—':(delta>=0?'+':'') + fmtN(delta)) +
-        '</td>' +
-        '<td>' + (delta===null?'<span class="tag t-neu">unknown</span>':delta>0?'<span class="tag t-inc">▲ Increase</span>':delta<0?'<span class="tag t-dec">▼ Decrease</span>':'<span class="tag t-neu">= No Change</span>') + '</td>';
+        '</td>';
       tbody.appendChild(row);
     });
 
-  const increases = accepted.filter(io => {
-    const l = S.live[io.ioId];
-    return l && l.currentBudget !== null && io.recommended > l.currentBudget;
-  }).length;
-  const decreases = accepted.filter(io => {
-    const l = S.live[io.ioId];
-    return l && l.currentBudget !== null && io.recommended < l.currentBudget;
-  }).length;
+  const increases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyCap !== null && io.recommended > l.dailyCap; }).length;
+  const decreases = accepted.filter(io => { const l = S.live[io.ioId]; return l && l.dailyCap !== null && io.recommended < l.dailyCap; }).length;
 
   document.getElementById('push-summary').innerHTML =
-    '<strong>' + accepted.length + ' IO' + (accepted.length!==1?'s':'') + '</strong> ready to push — ' +
+    '<strong>' + accepted.length + ' IO' + (accepted.length!==1?'s':'') + '</strong> ready to push \u2014 ' +
     increases + ' increase' + (increases!==1?'s':'') + ', ' +
-    decreases + ' decrease' + (decreases!==1?'s':'');
+    decreases + ' decrease' + (decreases!==1?'s':'') + ' to pacing daily cap';
 }
 
 // ─── PUSH ─────────────────────────────────────────────────────────────────────
@@ -957,76 +978,48 @@ async function executePush() {
   const accepted    = S.IOs.filter(io => S.accepted[io.ioId]);
 
   for(const io of accepted) {
-    const live = S.live[io.ioId] || {};
-    logEl.innerHTML += '> ' + io.ioId + ' — ' + (io.ioName || '') + '<br>';
-
-    const sentBudget = Math.round(io.recommended);
+    const live         = S.live[io.ioId] || {};
+    const sentDailyCap = Math.round(io.recommended);
+    logEl.innerHTML += '> ' + io.ioId + ' \u2014 ' + (io.ioName || '') + '<br>';
 
     if(S.tok === 'DEMO') {
       await new Promise(r => setTimeout(r, 80));
-      logEl.innerHTML += '&nbsp;&nbsp;\u2192 ' + fmtN(sentBudget) + ' imps <span class="pl-ok">\u2713 demo</span><br>';
-      receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: sentBudget, status: 'OK', error: '' });
+      logEl.innerHTML += '&nbsp;&nbsp;\u2192 dailyCap = ' + fmtN(sentDailyCap) + ' <span class="pl-ok">\u2713 demo</span><br>';
+      receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentDailyCap, confirmedDailyCap: sentDailyCap, status: 'OK', error: '' });
     } else {
       try {
-        const rawBudget = live.rawBudget || {};
-        const existingSegs = live.segments || [];
-
-        let updatedSegments;
-        if(existingSegs.length === 0) {
-          updatedSegments = [{ impressionCount: String(sentBudget) }];
-        } else if(existingSegs.length === 1) {
-          updatedSegments = [{ ...existingSegs[0], impressionCount: String(sentBudget) }];
-        } else {
-          const currentTotal = existingSegs.reduce((s, seg) => s + (parseInt(seg.impressionCount||'0')||0), 0);
-          updatedSegments = existingSegs.map(seg => {
-            const segCurrent = parseInt(seg.impressionCount||'0') || 0;
-            const weight = currentTotal > 0 ? segCurrent / currentTotal : 1 / existingSegs.length;
-            const newImp = Math.round(sentBudget * weight);
-            return { ...seg, impressionCount: String(newImp) };
-          });
-          const allocated = updatedSegments.reduce((s,seg) => s + parseInt(seg.impressionCount), 0);
-          const remainder = sentBudget - allocated;
-          if(remainder !== 0) {
-            const last = updatedSegments[updatedSegments.length-1];
-            last.impressionCount = String(parseInt(last.impressionCount) + remainder);
-          }
-        }
-
+        const rawPacing = live.rawPacing || {};
         const patchBody = {
-          budget: {
-            budgetUnit: 'BUDGET_UNIT_IMPRESSIONS',
-            automationType: rawBudget.automationType || 'INSERTION_ORDER_AUTOMATION_TYPE_NONE',
-            budgetSegments: updatedSegments
+          pacing: {
+            pacingPeriod: rawPacing.pacingPeriod || 'PACING_PERIOD_DAILY',
+            pacingType:   rawPacing.pacingType   || 'PACING_TYPE_EVEN',
+            dailyCap:     String(sentDailyCap)
           }
         };
 
         const res = await fetch(
-          'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId + '?updateMask=budget.budgetSegments',
+          'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId + '?updateMask=pacing.dailyCap',
           {
             method: 'PATCH',
-            headers: {
-              Authorization: 'Bearer ' + S.tok,
-              'Content-Type': 'application/json'
-            },
+            headers: { Authorization: 'Bearer ' + S.tok, 'Content-Type': 'application/json' },
             body: JSON.stringify(patchBody)
           }
         );
         const data = await res.json();
 
         if(res.ok) {
-          const returnedSegs = (data.budget && data.budget.budgetSegments) || [];
-          const confirmedTotal = returnedSegs.reduce((s, seg) => s + (parseInt(seg.impressionCount||'0')||0), 0);
-          const status = confirmedTotal === sentBudget ? 'OK' : 'MISMATCH';
-          logEl.innerHTML += '&nbsp;&nbsp;\u2192 ' + fmtN(sentBudget) + ' imps <span class="pl-ok">\u2713</span><br>';
-          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: confirmedTotal, status, error: '' });
+          const confirmedDailyCap = parseInt((data.pacing && data.pacing.dailyCap) || '0') || 0;
+          const status = confirmedDailyCap === sentDailyCap ? 'OK' : 'MISMATCH';
+          logEl.innerHTML += '&nbsp;&nbsp;\u2192 dailyCap = ' + fmtN(sentDailyCap) + ' <span class="pl-ok">\u2713</span><br>';
+          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentDailyCap, confirmedDailyCap, status, error: '' });
         } else {
           const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
           logEl.innerHTML += '&nbsp;&nbsp;<span class="pl-err">\u2717 ' + errMsg + '</span><br>';
-          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: null, status: 'ERROR', error: errMsg });
+          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentDailyCap, confirmedDailyCap: null, status: 'ERROR', error: errMsg });
         }
       } catch(err) {
         logEl.innerHTML += '&nbsp;&nbsp;<span class="pl-err">\u2717 ' + err.message + '</span><br>';
-        receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: null, status: 'ERROR', error: err.message });
+        receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentDailyCap, confirmedDailyCap: null, status: 'ERROR', error: err.message });
       }
     }
     logEl.scrollTop = logEl.scrollHeight;
@@ -1068,13 +1061,13 @@ function renderPushReceipt(rows, time) {
 
   document.getElementById('receipt-tbody').innerHTML = rows.map(r => {
     const statusTag = r.status === 'OK'
-      ? '<span class="tag t-ok">✓ Confirmed</span>'
+      ? '<span class="tag t-ok">\u2713 Confirmed</span>'
       : r.status === 'MISMATCH'
-      ? '<span class="tag t-warn">⚠ Mismatch</span>'
-      : '<span class="tag t-er">✗ Error</span>';
+      ? '<span class="tag t-warn">\u26a0 Mismatch</span>'
+      : '<span class="tag t-er">\u2717 Error</span>';
 
-    const confirmedCell = r.confirmedBudget !== null
-      ? '<span style="color:' + (r.confirmedBudget===r.sentBudget?'var(--emerald)':'var(--amber)') + '">' + fmtN(r.confirmedBudget) + '</span>'
+    const confirmedCell = r.confirmedDailyCap !== null && r.confirmedDailyCap !== undefined
+      ? '<span style="color:' + (r.confirmedDailyCap===r.sentDailyCap?'var(--emerald)':'var(--amber)') + '">' + fmtN(r.confirmedDailyCap) + '</span>'
       : '<span style="color:var(--coral)">—</span>';
 
     return '<tr>' +
@@ -1082,8 +1075,8 @@ function renderPushReceipt(rows, time) {
         '<div style="color:var(--ink);font-weight:600;">' + (r.ioName||r.ioId) + '</div>' +
         '<div style="color:var(--ink3);font-size:9px;">' + r.ioId + '</div>' +
       '</td>' +
-      '<td style="color:var(--ink2);">' + (r.advName||r.advId) + '</td>' +
-      '<td style="font-family:var(--mono);">' + fmtN(r.sentBudget) + '</td>' +
+      '<td style="color:var(--ink2);">' + (r.advName||'') + '</td>' +
+      '<td style="font-family:var(--mono);">' + fmtN(r.sentDailyCap) + '</td>' +
       '<td style="font-family:var(--mono);">' + confirmedCell + '</td>' +
       '<td>' + statusTag + '</td>' +
       '<td style="font-family:var(--mono);font-size:10px;color:var(--coral);">' + (r.error||'') + '</td>' +
@@ -1094,17 +1087,21 @@ function renderPushReceipt(rows, time) {
 // ─── AUDIT CSV ────────────────────────────────────────────────────────────────
 function exportAuditCSV() {
   const accepted = S.IOs.filter(io => S.accepted[io.ioId]);
-  const headers = 'IO_ID,IO_Name,Client,DV360_Advertiser_ID,Yesterday_Imps,Daily_Need,Current_Budget_Live,Proposed_Budget,Delta_Imps,Pct_Change,Days_Remaining,Imps_Remaining,Segments_Count\n';
+  const headers = 'IO_ID,IO_Name,Client,DV360_Advertiser_ID,Yesterday_Imps,Daily_Need,Pacing_Period,Pacing_Type,Current_Daily_Cap,Proposed_Daily_Cap,Delta,Pct_Change,Days_Remaining,Imps_Remaining\n';
   const csv = accepted.map(io => {
     const live    = S.live[io.ioId] || {};
-    const current = live.currentBudget !== null && live.currentBudget !== undefined ? live.currentBudget : '';
+    const current = live.dailyCap !== undefined && live.dailyCap !== null ? live.dailyCap : '';
     const rec     = io.recommended;
     const delta   = current !== '' ? (rec - current) : '';
     const pct     = current && current > 0 && delta !== '' ? (delta/current*100).toFixed(2)+'%' : '';
-    const segs    = (live.segments||[]).length;
-    return '"' + io.ioId + '","' + (io.ioName||'').replace(/"/g,"'") + '","' + (io.advName||'') + '","' + (io.dv360AdvId||'') + '",' + (io.yesterdayImps||'') + ',' + (io.dailyNeed||'') + ',' + current + ',' + rec + ',' + delta + ',"' + pct + '",' + (io.daysRemaining||'') + ',' + (io.impsRemaining||'') + ',' + segs;
+    const period  = (live.pacingPeriod||'').replace('PACING_PERIOD_','');
+    const type    = (live.pacingType||'').replace('PACING_TYPE_','');
+    return '"' + io.ioId + '","' + (io.ioName||'').replace(/"/g,"'") + '","' + (io.advName||'') + '","' + (io.dv360AdvId||'') + '",' +
+      (io.yesterdayImps||'') + ',' + (io.dailyNeed||'') + ',"' + period + '","' + type + '",' +
+      current + ',' + rec + ',' + delta + ',"' + pct + '",' +
+      (io.daysRemaining||'') + ',' + (io.impsRemaining||'');
   }).join('\n');
-  downloadCSV('dv360_io_budget_audit_' + new Date().toISOString().split('T')[0] + '.csv', headers+csv);
+  downloadCSV('dv360_io_pacing_audit_' + new Date().toISOString().split('T')[0] + '.csv', headers+csv);
 }
 </script>
 </body>
