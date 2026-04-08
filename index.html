@@ -681,10 +681,10 @@ async function startFetch() {
           log('  \u2717 ' + errMsg, 'log-err');
         } else {
           const pacing = data.pacing || {};
-          const pacingPeriod = pacing.pacingPeriod || '';
-          const pacingType   = pacing.pacingType   || '';
-          const dailyCap     = parseInt(pacing.dailyMaxImpressions || '0') || 0;
-          const isDaily      = pacingPeriod === 'PACING_PERIOD_DAILY';
+          const pacingPeriod        = pacing.pacingPeriod || '';
+          const pacingType          = pacing.pacingType   || '';
+          const dailyMaxImpressions = parseInt(pacing.dailyMaxImpressions || '0') || 0;
+          const isDaily             = pacingPeriod === 'PACING_PERIOD_DAILY';
 
           // Diagnostic: log raw pacing object for first IO
           if(i === 0) {
@@ -708,9 +708,9 @@ async function startFetch() {
           if(!isDaily) {
             log('  \u26a0 pacing period: ' + periodLabel + ' (not daily \u2014 excluded from push)', 'log-warn');
           } else if(typeLabel === 'asap') {
-            log('  \u26a0 dailyCap = ' + fmtN(dailyCap) + '  period: ' + periodLabel + '  type: ' + typeLabel + ' (ASAP \u2014 cap may be stored separately)', 'log-warn');
+            log('  \u26a0 dailyMaxImpressions = ' + fmtN(dailyMaxImpressions) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-warn');
           } else {
-            log('  dailyCap = ' + fmtN(dailyCap) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-ok');
+            log('  dailyMaxImpressions = ' + fmtN(dailyMaxImpressions) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-ok');
           }
         }
       } catch(err) {
