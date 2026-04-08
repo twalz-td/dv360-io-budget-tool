@@ -1,0 +1,1111 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TravelDesk — DV360 IO Budget Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --coral:#D4533A; --coral-dark:#b8422b; --coral-light:#F5E8E4; --coral-mid:#EAB5A8;
+  --ink:#1A1410; --ink2:#4A3F38; --ink3:#8C7E76; --ink4:#C4B8B2;
+  --paper:#FDFCFB; --paper2:#F7F3F0; --paper3:#EFE9E4; --paper4:#E5DDD7;
+  --white:#FFFFFF;
+  --emerald:#1A7A5E; --emerald-light:#E8F5F0; --emerald-mid:#A8D5C6;
+  --amber:#B8620A; --amber-light:#FEF3E2; --amber-mid:#F5C980;
+  --sky:#1A5FA8; --sky-light:#E8F0FB;
+  --border:#E0D6CF; --border2:#CEC3BB; --border3:#B8ABA2;
+  --shadow: 0 1px 3px rgba(26,20,16,0.06), 0 4px 12px rgba(26,20,16,0.04);
+  --shadow-md: 0 4px 16px rgba(26,20,16,0.08), 0 1px 4px rgba(26,20,16,0.05);
+  --shadow-lg: 0 8px 32px rgba(26,20,16,0.10), 0 2px 8px rgba(26,20,16,0.06);
+  --mono:'JetBrains Mono',monospace;
+  --sans:'Plus Jakarta Sans',sans-serif;
+  --display:'Fraunces',serif;
+  --r:8px; --rl:12px; --rxl:20px;
+  --transition: all 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--sans);background:var(--paper2);color:var(--ink);font-size:14px;line-height:1.6;min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:radial-gradient(circle at 20% 50%, rgba(212,83,58,0.03) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(26,122,94,0.03) 0%, transparent 50%);pointer-events:none;z-index:0;}
+
+/* HEADER */
+header{background:rgba(253,252,251,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 40px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 1px 0 var(--border), 0 2px 8px rgba(26,20,16,0.04);}
+.la{display:flex;align-items:center;gap:16px;}
+.la img{height:22px;width:auto;}
+.la-fallback{font-family:var(--display);font-size:16px;font-weight:600;color:var(--ink);letter-spacing:-.02em;}
+.ld{width:1px;height:20px;background:var(--border2);}
+.lapp{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.1em;text-transform:uppercase;}
+
+/* STEP NAV */
+.snav{display:flex;align-items:center;}
+.si{display:flex;align-items:center;gap:8px;padding:8px 14px;color:var(--ink4);cursor:default;transition:var(--transition);position:relative;font-family:var(--mono);font-size:10px;letter-spacing:.04em;}
+.si+.si::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:16px;background:var(--border);}
+.si.active{color:var(--ink);}
+.si.done{color:var(--coral);cursor:pointer;}
+.si.done:hover{background:var(--coral-light);border-radius:var(--r);}
+.snum{width:20px;height:20px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:9px;flex-shrink:0;transition:var(--transition);font-weight:600;}
+.si.active .snum{background:var(--coral);border-color:var(--coral);color:#fff;box-shadow:0 2px 8px rgba(212,83,58,0.3);}
+.si.done .snum{background:var(--coral);border-color:var(--coral);color:#fff;}
+
+/* AUTH BADGE */
+.ab{font-family:var(--mono);font-size:10px;padding:5px 14px;border-radius:20px;border:1.5px solid var(--border2);color:var(--ink3);letter-spacing:.06em;transition:var(--transition);background:var(--paper3);}
+.ab.on{border-color:var(--coral);color:var(--coral);background:var(--coral-light);}
+
+/* MAIN */
+main{padding:48px 40px;max-width:1320px;margin:0 auto;width:100%;position:relative;z-index:1;}
+.screen{display:none;animation:fadeIn .25s ease;}.screen.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+/* SCREEN TITLE */
+.pt{font-family:var(--display);font-size:34px;font-weight:600;letter-spacing:-.03em;margin-bottom:8px;line-height:1.1;color:var(--ink);}
+.pt strong{color:var(--coral);}
+.ps{font-size:14px;color:var(--ink3);margin-bottom:40px;max-width:580px;line-height:1.75;font-weight:300;}
+
+/* CARDS */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);padding:28px;margin-bottom:16px;box-shadow:var(--shadow);}
+.ct{font-family:var(--mono);font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.14em;text-transform:uppercase;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.ct::before{content:'';width:3px;height:12px;background:var(--coral);border-radius:2px;}
+
+/* FORM */
+label.fl{font-size:12px;color:var(--ink2);display:block;margin-bottom:6px;font-family:var(--mono);letter-spacing:.02em;font-weight:500;}
+input[type=text]{width:100%;background:var(--paper2);border:1.5px solid var(--border);border-radius:var(--r);padding:11px 14px;color:var(--ink);font-family:var(--mono);font-size:12px;outline:none;margin-bottom:16px;transition:var(--transition);}
+input[type=text]:focus{border-color:var(--coral);box-shadow:0 0 0 3px rgba(212,83,58,0.1);background:var(--white);}
+input[type=text]::placeholder{color:var(--ink4);}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:var(--r);font-family:var(--mono);font-size:11px;font-weight:500;cursor:pointer;border:1.5px solid var(--border2);background:var(--white);color:var(--ink2);transition:var(--transition);letter-spacing:.04em;white-space:nowrap;box-shadow:0 1px 2px rgba(26,20,16,0.06);}
+.btn:hover{border-color:var(--coral);color:var(--coral);background:var(--coral-light);}
+.btn:active{transform:scale(0.98);}
+.bp{background:var(--coral);border-color:var(--coral);color:#fff;box-shadow:0 2px 8px rgba(212,83,58,0.25);}
+.bp:hover{background:var(--coral-dark);border-color:var(--coral-dark);color:#fff;box-shadow:0 4px 16px rgba(212,83,58,0.3);}
+.bc{background:var(--emerald);border-color:var(--emerald);color:#fff;box-shadow:0 2px 8px rgba(26,122,94,0.25);}
+.bc:hover{background:#156a50;border-color:#156a50;color:#fff;box-shadow:0 4px 16px rgba(26,122,94,0.3);}
+.btn:disabled{opacity:0.45;cursor:not-allowed;pointer-events:none;}
+
+/* DROP ZONE */
+.drop-zone{border:2px dashed var(--border2);border-radius:var(--rl);padding:56px 40px;text-align:center;cursor:pointer;transition:var(--transition);position:relative;overflow:hidden;background:var(--paper2);}
+.drop-zone:hover{border-color:var(--coral);background:var(--coral-light);}
+.dz-icon{width:40px;height:40px;margin:0 auto 16px;color:var(--ink4);display:flex;align-items:center;justify-content:center;}
+.dz-icon svg{width:40px;height:40px;}
+.dz-text{font-size:14px;color:var(--ink2);margin-bottom:6px;font-weight:500;}
+.dz-hint{font-family:var(--mono);font-size:10px;color:var(--ink3);}
+
+/* CODE BLOCK */
+.codeblk{background:var(--paper3);border:1px solid var(--border);border-radius:var(--r);padding:16px 18px;font-family:var(--mono);font-size:11px;color:var(--ink2);line-height:2;letter-spacing:.02em;}
+.codeblk span{color:var(--coral);font-weight:500;}
+
+/* PROGRESS BAR */
+.pb-wrap{margin:24px 0;}
+.pb-track{height:4px;background:var(--paper3);border-radius:2px;overflow:hidden;}
+.pb-fill{height:100%;background:linear-gradient(90deg,var(--coral-dark),var(--coral));width:0%;transition:width .4s cubic-bezier(0.4,0,0.2,1);border-radius:2px;}
+.pb-labels{display:flex;justify-content:space-between;margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--ink3);}
+.fetch-log{font-family:var(--mono);font-size:11px;color:var(--ink2);height:200px;overflow-y:auto;line-height:2.2;padding:12px 16px;background:var(--paper2);border-radius:var(--r);border:1px solid var(--border);}
+.fetch-log .log-ok{color:var(--emerald);font-weight:500;}
+.fetch-log .log-warn{color:var(--amber);font-weight:500;}
+.fetch-log .log-err{color:var(--coral);font-weight:500;}
+
+/* STATUS TAG */
+.tag{font-family:var(--mono);font-size:9px;padding:4px 10px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;font-weight:600;}
+.t-ok{background:var(--emerald-light);color:var(--emerald);border:1px solid var(--emerald-mid);}
+.t-warn{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-mid);}
+.t-er{background:var(--coral-light);color:var(--coral);border:1px solid var(--coral-mid);}
+.t-neu{background:var(--paper3);color:var(--ink3);border:1px solid var(--border2);}
+.t-inc{background:var(--emerald-light);color:var(--emerald);border:1px solid var(--emerald-mid);}
+.t-dec{background:var(--amber-light);color:var(--amber);border:1px solid var(--amber-mid);}
+
+/* REVIEW CARDS */
+.io-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:20px;overflow:hidden;transition:var(--transition);box-shadow:var(--shadow);}
+.io-card:hover{border-color:var(--border2);box-shadow:var(--shadow-md);}
+.io-card.rejected{opacity:0.55;}
+.io-hd{padding:18px 24px;background:var(--paper2);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+.io-hd-left{display:flex;align-items:center;gap:14px;}
+.io-name{font-family:var(--sans);font-size:13px;font-weight:600;color:var(--ink);}
+.io-id{font-family:var(--mono);font-size:10px;color:var(--ink3);}
+.io-hd-right{display:flex;align-items:center;gap:12px;}
+
+/* BUDGET COMPARISON */
+.bud-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0;background:var(--border);border-bottom:1px solid var(--border);}
+.bud-cell{background:var(--white);padding:20px 24px;border-right:1px solid var(--border);}
+.bud-cell:last-child{border-right:none;}
+.bc-label{font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;}
+.bc-val{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:-.03em;line-height:1;color:var(--ink);}
+.bc-sub{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:5px;}
+.bc-delta{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:10px;margin-top:7px;font-weight:600;}
+.bc-delta.pos{background:var(--emerald-light);color:var(--emerald);}
+.bc-delta.neg{background:var(--amber-light);color:var(--amber);}
+.bc-delta.zero{background:var(--paper3);color:var(--ink3);}
+
+/* TOGGLE */
+.toggle-wrap{display:flex;align-items:center;gap:10px;cursor:pointer;}
+.toggle-wrap span{font-family:var(--mono);font-size:10px;color:var(--ink2);font-weight:500;}
+.toggle{width:36px;height:20px;background:var(--paper3);border-radius:10px;position:relative;transition:var(--transition);border:1.5px solid var(--border2);}
+.toggle.on{background:var(--coral);border-color:var(--coral);}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;background:#fff;border-radius:50%;transition:var(--transition);box-shadow:0 1px 3px rgba(0,0,0,0.15);}
+.toggle.on::after{transform:translateX(16px);}
+
+/* IO BODY */
+.io-body{padding:20px 24px;}
+
+/* SEGMENTS TABLE */
+.seg-table{width:100%;border-collapse:collapse;font-size:11px;}
+.seg-table thead th{font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:left;padding:10px 10px;border-bottom:2px solid var(--border);letter-spacing:.08em;text-transform:uppercase;background:var(--paper2);}
+.seg-table tbody td{padding:11px 10px;border-bottom:1px solid var(--border);color:var(--ink2);font-family:var(--mono);}
+.seg-table tbody tr:last-child td{border-bottom:none;}
+.seg-table tbody tr:hover td{background:var(--paper2);}
+.seg-table .td-new{color:var(--ink);font-weight:600;}
+.seg-table .td-pos{color:var(--emerald);font-weight:600;}
+.seg-table .td-neg{color:var(--amber);font-weight:600;}
+
+/* INSIGHT BAR */
+.insight-bar{display:flex;align-items:flex-start;gap:12px;padding:14px 24px;background:var(--emerald-light);border-top:1px solid var(--emerald-mid);}
+.insight-bar.warn{background:var(--amber-light);border-color:var(--amber-mid);}
+.insight-bar.err{background:var(--coral-light);border-color:var(--coral-mid);}
+.ib-dot{width:7px;height:7px;border-radius:50%;background:var(--emerald);flex-shrink:0;margin-top:4px;}
+.insight-bar.warn .ib-dot{background:var(--amber);}
+.insight-bar.err .ib-dot{background:var(--coral);}
+.ib-text{font-family:var(--mono);font-size:10px;color:var(--ink2);line-height:1.7;}
+.ib-text strong{color:var(--ink);font-weight:600;}
+
+/* ADV GROUP HEADER */
+.adv-group-hd{font-family:var(--mono);font-size:10px;color:var(--ink3);letter-spacing:.08em;text-transform:uppercase;padding:20px 0 10px;border-bottom:2px solid var(--border);margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.adv-group-hd::before{content:'';width:3px;height:14px;background:var(--coral-mid);border-radius:2px;}
+
+/* PUSH TABLE */
+.push-table{width:100%;border-collapse:collapse;}
+.push-table thead th{font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:left;padding:11px 14px;border-bottom:2px solid var(--border);letter-spacing:.08em;text-transform:uppercase;background:var(--paper2);}
+.push-table tbody td{padding:12px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--ink2);}
+.push-table tbody tr:hover td{background:var(--paper2);}
+.push-table tbody tr:last-child td{border-bottom:none;}
+.push-table .adv-group-row td{background:var(--paper3);color:var(--ink);font-size:10px;letter-spacing:.04em;padding:9px 14px;font-weight:600;border-top:2px solid var(--border);}
+
+/* PUSH LOG */
+.push-log{background:var(--ink);border-radius:var(--r);padding:20px;font-family:var(--mono);font-size:11px;color:#C4B8B2;max-height:260px;overflow-y:auto;line-height:2.2;}
+.push-log .pl-ok{color:#4ADE80;font-weight:600;}
+.push-log .pl-err{color:#F87171;font-weight:600;}
+
+/* SUMMARY HERO */
+.sav-hero{background:var(--white);border:1px solid var(--border);border-radius:var(--rxl);padding:48px 40px;text-align:center;margin-bottom:24px;position:relative;overflow:hidden;box-shadow:var(--shadow-md);}
+.sav-hero::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--coral-dark),var(--coral),var(--coral-mid));}
+.sav-hero-label{font-family:var(--mono);font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.14em;margin-bottom:16px;}
+.sav-hero-val{font-family:var(--display);font-size:72px;font-weight:700;color:var(--coral);letter-spacing:-.05em;line-height:1;}
+.sav-hero-sub{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-top:14px;}
+
+.sav-metrics-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+.sav-met{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);padding:24px;box-shadow:var(--shadow);}
+.sm-label{font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;}
+.sm-val{font-family:var(--display);font-size:30px;font-weight:600;letter-spacing:-.04em;color:var(--ink);}
+.sm-sub{font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:6px;}
+
+/* IMPACT TABLE */
+.impact-table{width:100%;border-collapse:collapse;}
+.impact-table thead th{font-family:var(--mono);font-size:9px;color:var(--ink3);text-align:left;padding:10px 14px;border-bottom:2px solid var(--border);letter-spacing:.08em;text-transform:uppercase;background:var(--paper2);}
+.impact-table tbody td{padding:13px 14px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:var(--ink2);}
+.impact-table tbody tr:last-child td{border-bottom:none;}
+.impact-table tbody tr:hover td{background:var(--paper2);}
+.impact-table .td-io{color:var(--ink);font-weight:600;}
+
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:24px 0;}
+
+/* ROW ACTIONS */
+.row-actions{display:flex;gap:12px;align-items:center;padding:20px 0;justify-content:flex-end;}
+
+/* CONNECT */
+.connect-split{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.ci-row{display:flex;align-items:flex-start;gap:16px;padding:18px 0;border-bottom:1px solid var(--border);}
+.ci-row:last-child{border-bottom:none;}
+.ci-num{font-family:var(--display);font-size:28px;font-weight:700;color:var(--coral-light);line-height:1;flex-shrink:0;width:32px;-webkit-text-stroke:1px var(--coral-mid);}
+.ci-text strong{font-size:13px;color:var(--ink);display:block;margin-bottom:3px;font-weight:600;}
+.ci-text span{font-size:12px;color:var(--ink3);}
+
+/* IMPACT CARD */
+.impact-card{background:var(--white);border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--shadow);}
+.impact-card-hd{padding:18px 24px;background:var(--paper2);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.impact-card-hd-title{font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.12em;font-weight:500;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--paper3);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--border3);}
+
+@media(max-width:900px){
+  header{padding:0 20px;}
+  main{padding:32px 20px;}
+  .connect-split{grid-template-columns:1fr;}
+  .bud-grid{grid-template-columns:repeat(2,1fr);}
+  .sav-metrics-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="la">
+    <img id="header-logo" src="https://traveldeskglobal.com/wp-content/uploads/2024/03/TD-Logo-White.png" style="filter:invert(1) sepia(1) saturate(0) brightness(0.2)" alt="TravelDesk" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+    <div id="logo-fallback" style="display:none;" class="la-fallback">TravelDesk</div>
+    <div class="ld"></div>
+    <span class="lapp">DV360 IO Budget Optimizer</span>
+  </div>
+  <div class="snav">
+    <div class="si active" data-step="0"><div class="snum">1</div><span>Connect</span></div>
+    <div class="si" data-step="1"><div class="snum">2</div><span>Upload</span></div>
+    <div class="si" data-step="2"><div class="snum">3</div><span>Fetch</span></div>
+    <div class="si" data-step="3"><div class="snum">4</div><span>Review</span></div>
+    <div class="si" data-step="4"><div class="snum">5</div><span>Push</span></div>
+  </div>
+  <div class="ab" id="auth-badge">not connected</div>
+</header>
+
+<main>
+
+  <!-- SCREEN 0: CONNECT -->
+  <div class="screen active" id="screen-0">
+    <div class="pt">Connect to <strong>DV360</strong></div>
+    <div class="ps">Authenticate with Google OAuth2 to enable live IO budget fetching and API updates.</div>
+    <div class="connect-split">
+      <div class="card">
+        <div class="ct">OAuth Configuration</div>
+        <label class="fl">Google OAuth2 Client ID</label>
+        <input type="text" id="client-id" placeholder="xxxxxxxx.apps.googleusercontent.com">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn bp" onclick="startAuth()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            Connect with Google
+          </button>
+          <button class="btn" onclick="useDemoData()">Use Demo Data</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">How It Works</div>
+        <div>
+          <div class="ci-row"><div class="ci-num">01</div><div class="ci-text"><strong>Authenticate</strong><span>OAuth2 token stays in browser memory — never persists to server</span></div></div>
+          <div class="ci-row"><div class="ci-num">02</div><div class="ci-text"><strong>Upload CSV/TSV</strong><span>BigQuery export with IO-level budget recommendations</span></div></div>
+          <div class="ci-row"><div class="ci-num">03</div><div class="ci-text"><strong>Fetch Live Budgets</strong><span>Pulls current IO budget segments direct from DV360 v4 API</span></div></div>
+          <div class="ci-row"><div class="ci-num">04</div><div class="ci-text"><strong>Review &amp; Push</strong><span>Accept/reject per IO, then PATCH budget segments via API</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 1: UPLOAD -->
+  <div class="screen" id="screen-1">
+    <div class="pt">Upload <strong>Input File</strong></div>
+    <div class="ps">Upload your BigQuery IO budget export. Tab-separated and comma-separated files are both supported.</div>
+    <div class="card">
+      <div class="ct">Required Schema</div>
+      <div class="codeblk">
+        <span>Advertiser_ID</span> (numeric DV360 ID), <span>Advertiser</span> (client name),
+        <span>Insertion_Order_ID</span>, Insertion_Order,
+        <span>suggested_io_budget</span>, <span>io_impressions_daily_need</span>, <span>yesterday_impressions</span>,
+        Total_Contract_Impressions, Total_DCM_Impressions, Product_Start_Date, Product_End_Date,
+        days_remaining, total_impressions_remaining
+      </div>
+      <div style="height:20px;"></div>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-in').click()" ondragover="event.preventDefault();this.style.borderColor='var(--coral)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
+        <div class="dz-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="dz-text">Drop CSV or TSV here</div>
+        <div class="dz-hint">or click to browse</div>
+      </div>
+      <input type="file" id="csv-in" accept=".csv,.tsv,.txt" style="display:none" onchange="loadCSV(this)">
+      <div id="upload-status" style="margin-top:16px;font-family:var(--mono);font-size:11px;"></div>
+    </div>
+    <div id="loaded-summary" style="display:none;text-align:right;margin-top:8px;">
+      <button class="btn bp" onclick="startFetch()">
+        Fetch Live IO Budgets
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 2: FETCH -->
+  <div class="screen" id="screen-2">
+    <div class="pt">Fetching <strong>Live Budgets</strong></div>
+    <div class="ps">Pulling current IO budget segments from DV360 v4 API. One GET per IO.</div>
+    <div class="card">
+      <div class="ct">API Fetch Progress</div>
+      <div class="pb-wrap">
+        <div class="pb-track"><div class="pb-fill" id="fetch-fill"></div></div>
+        <div class="pb-labels"><span id="fetch-pct">0%</span><span id="fetch-status">Initialising...</span></div>
+      </div>
+      <div class="fetch-log" id="fetch-log"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN 3: REVIEW -->
+  <div class="screen" id="screen-3">
+    <div class="pt">Budget <strong>Review</strong></div>
+    <div class="ps">Compare current vs. recommended IO budgets. Toggle off any IOs to exclude from the push.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:24px;flex-wrap:wrap;">
+      <button class="btn" onclick="acceptAll()">Accept All</button>
+      <button class="btn" onclick="rejectAll()">Reject All</button>
+      <div style="flex:1;"></div>
+      <div id="review-summary" style="font-family:var(--mono);font-size:11px;color:var(--ink3);"></div>
+    </div>
+    <div id="review-io-cards"></div>
+    <div class="row-actions">
+      <button class="btn bp" onclick="goToScreen(4)">
+        Proceed to Push
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- SCREEN 4: PUSH -->
+  <div class="screen" id="screen-4">
+    <div class="pt">Push to <strong>DV360</strong></div>
+    <div class="ps">Final review of accepted IO budget updates before committing to the API.</div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <div class="ct">Accepted IO Updates — Pre-Push Review</div>
+      <div style="overflow-x:auto;">
+        <table class="push-table" id="push-review-table">
+          <thead>
+            <tr>
+              <th>Insertion Order</th>
+              <th>Advertiser</th>
+              <th>Current Budget</th>
+              <th>Recommended Budget</th>
+              <th>Delta</th>
+              <th>Direction</th>
+            </tr>
+          </thead>
+          <tbody id="push-review-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="push-summary" style="margin-bottom:20px;font-size:14px;color:var(--ink2);font-family:var(--mono);"></div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+        <button class="btn bc" id="push-btn" onclick="executePush()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Confirm &amp; Push Live Updates
+        </button>
+        <button class="btn" onclick="exportAuditCSV()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export Audit CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="push-log" id="push-log" style="display:none;margin-top:16px;"></div>
+
+    <div id="push-receipt" style="display:none;margin-top:24px;">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+          <div class="ct" style="margin-bottom:0;">Push Receipt</div>
+          <div id="receipt-timestamp" style="font-family:var(--mono);font-size:10px;color:var(--ink3);"></div>
+        </div>
+        <div id="receipt-summary" style="display:flex;gap:20px;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);"></div>
+        <div style="overflow-x:auto;">
+          <table class="push-table" id="receipt-table">
+            <thead>
+              <tr>
+                <th>Insertion Order</th>
+                <th>Advertiser</th>
+                <th>Sent Budget</th>
+                <th>DV360 Confirmed</th>
+                <th>Status</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody id="receipt-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {
+  tok: null,
+  IOs: [],       // parsed from CSV: [{advId, advName, ioId, ioName, recommended}]
+  live: {},      // keyed by ioId: {currentBudget, segments, fetchError}
+  accepted: {},  // keyed by ioId: bool
+  pushReceipt: null
+};
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function downloadCSV(filename, csvContent) {
+  const w = window.open('', '_blank');
+  if(w) {
+    w.document.write('<pre>' + csvContent.replace(/</g,'&lt;') + '</pre>');
+    w.document.title = filename;
+    w.focus();
+  } else {
+    navigator.clipboard.writeText(csvContent).then(() => {
+      alert('Download blocked — CSV copied to clipboard instead.');
+    }).catch(() => {
+      alert('Could not download or copy. Check popup blocker settings.');
+    });
+  }
+}
+
+function fmtN(n) {
+  if(n === null || n === undefined || isNaN(n)) return '—';
+  return Math.round(n).toLocaleString();
+}
+
+function goToScreen(n) {
+  document.querySelectorAll('.screen').forEach((s,i) => s.classList.toggle('active', i===n));
+  document.querySelectorAll('.si').forEach((el,i) => {
+    el.classList.toggle('active', i===n);
+    el.classList.toggle('done', i<n);
+  });
+  if(n===3) renderReview();
+  if(n===4) renderPushScreen();
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+function startAuth() {
+  const cid = document.getElementById('client-id').value.trim();
+  if(!cid) return alert('Enter your OAuth2 Client ID');
+  const p = new URLSearchParams({
+    client_id: cid,
+    redirect_uri: window.location.origin + window.location.pathname,
+    response_type: 'token',
+    scope: 'https://www.googleapis.com/auth/display-video',
+    state: 'td-io'
+  });
+  window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + p;
+}
+
+window.onload = () => {
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  if(params.has('access_token')) {
+    S.tok = params.get('access_token');
+    setBadge('connected', true);
+    goToScreen(1);
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+};
+
+function setBadge(text, on) {
+  const b = document.getElementById('auth-badge');
+  b.textContent = text;
+  b.classList.toggle('on', on);
+}
+
+function useDemoData() {
+  S.tok = 'DEMO';
+  setBadge('demo mode', true);
+  goToScreen(1);
+}
+
+// ─── CSV PARSE ────────────────────────────────────────────────────────────────
+function detectDelimiter(line) {
+  const tabs = (line.match(/\t/g)||[]).length;
+  const commas = (line.match(/,/g)||[]).length;
+  return tabs > commas ? '\t' : ',';
+}
+
+function parseLine(line, delim) {
+  if(delim === '\t') return line.split('\t').map(s => s.trim());
+  const result = []; let cur = ''; let inQ = false;
+  for(let i=0;i<line.length;i++){
+    const c = line[i];
+    if(c==='"') inQ=!inQ;
+    else if(c===',' && !inQ){result.push(cur.trim());cur='';}
+    else cur+=c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function norm(h) { return h.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
+
+function handleDrop(e) {
+  e.preventDefault();
+  e.currentTarget.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if(file) { const inp = document.getElementById('csv-in'); inp.files = e.dataTransfer.files; loadCSVFile(file); }
+}
+
+function loadCSV(input) { if(input.files[0]) loadCSVFile(input.files[0]); }
+
+function loadCSVFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const raw = e.target.result;
+    const lines = raw.split('\n').filter(l => l.trim());
+    if(lines.length < 2) { setUploadStatus('File appears empty or invalid.', false); return; }
+
+    const delim = detectDelimiter(lines[0]);
+    const headers = parseLine(lines[0], delim).map(h => norm(h));
+
+    // Column alias map — final schema:
+    // Advertiser_ID = numeric DV360 advertiser ID (API calls)
+    // Advertiser    = client name (display/grouping)
+    const alias = h => {
+      const variants = {
+        dv360_advertiser_id:       ['advertiser_id','dv360_advertiser_id','advertiserid','adv_id'],
+        advertiser_name:           ['advertiser','advertiser_name','client','client_name'],
+        insertion_order_id:        ['insertion_order_id','insertionorderid','dcm_package_id','io_id'],
+        insertion_order:           ['insertion_order','io_name','insertion_order_name'],
+        suggested_io_budget:       ['suggested_io_budget','io_impressions_needed','io_impressions_needed_per_day','recommended_impressions'],
+        io_impressions_daily_need: ['io_impressions_daily_need','daily_need','needed_imps_daily','daily_impressions_needed'],
+        yesterday_impressions:     ['yesterday_impressions','imps_yesterday','yesterdays_impressions','yesterday_delivered'],
+        days_remaining:              ['days_remaining'],
+        total_impressions_remaining: ['total_impressions_remaining'],
+        total_contract_impressions:  ['total_contract_impressions'],
+        total_dcm_impressions:       ['total_dcm_impressions'],
+        product_start_date:          ['product_start_date'],
+        product_end_date:            ['product_end_date'],
+      };
+      for(const [key, alts] of Object.entries(variants)) {
+        if(alts.includes(h)) return key;
+      }
+      return h;
+    };
+
+    const hMap = {};
+    headers.forEach((h, i) => { hMap[alias(h)] = i; });
+
+    const get  = (cols, key, fb='') => cols[hMap[key]] !== undefined ? cols[hMap[key]] : fb;
+    const getF = (cols, key) => Math.round(parseFloat(get(cols, key)) || 0);
+
+    const rows = lines.slice(1).map(line => {
+      const cols = parseLine(line, delim);
+      return {
+        dv360AdvId:    get(cols, 'dv360_advertiser_id'),  // numeric — for API calls
+        advName:       get(cols, 'advertiser_name'),       // client name — for display/grouping
+        ioId:          get(cols, 'insertion_order_id'),
+        ioName:        get(cols, 'insertion_order'),
+        recommended:   getF(cols, 'suggested_io_budget'),
+        dailyNeed:     getF(cols, 'io_impressions_daily_need'),
+        yesterdayImps: getF(cols, 'yesterday_impressions'),
+        daysRemaining: getF(cols, 'days_remaining'),
+        impsRemaining: getF(cols, 'total_impressions_remaining'),
+        contractImps:  getF(cols, 'total_contract_impressions'),
+        dcmImps:       getF(cols, 'total_dcm_impressions'),
+        startDate:     get(cols, 'product_start_date'),
+        endDate:       get(cols, 'product_end_date'),
+      };
+    }).filter(r => r.ioId);
+
+    if(rows.length === 0) { setUploadStatus('No valid rows found. Check column names.', false); return; }
+
+    const missingDv360Id = rows.filter(r => !r.dv360AdvId).length;
+
+    // Deduplicate IOs (take first occurrence per ioId)
+    const seen = new Set();
+    S.IOs = rows.filter(r => { if(seen.has(r.ioId)) return false; seen.add(r.ioId); return true; });
+
+    document.getElementById('loaded-summary').style.display = 'block';
+    const clientCount = new Set(S.IOs.map(r=>r.advName).filter(Boolean)).size;
+    let statusMsg = '\u2713  Loaded ' + S.IOs.length + ' IOs across ' + clientCount + ' client' + (clientCount!==1?'s':'') + '  (' + (delim==='\t'?'TSV':'CSV') + ' detected)';
+    if(missingDv360Id > 0) statusMsg += ' \u2014 \u26a0 ' + missingDv360Id + ' rows missing numeric Advertiser_ID';
+    setUploadStatus(statusMsg, missingDv360Id === 0);
+  };
+  reader.readAsText(file);
+}
+
+function setUploadStatus(msg, ok) {
+  const el = document.getElementById('upload-status');
+  el.textContent = msg;
+  el.style.color = ok ? 'var(--emerald)' : 'var(--coral)';
+}
+
+// ─── FETCH LIVE BUDGETS ───────────────────────────────────────────────────────
+async function startFetch() {
+  goToScreen(2);
+  S.live = {};
+  S.accepted = {};
+
+  const logEl  = document.getElementById('fetch-log');
+  const fillEl = document.getElementById('fetch-fill');
+  const pctEl  = document.getElementById('fetch-pct');
+  const statEl = document.getElementById('fetch-status');
+
+  logEl.innerHTML = '';
+
+  function log(msg, cls='') {
+    logEl.innerHTML += '<span class="' + cls + '">' + msg + '</span><br>';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const total = S.IOs.length;
+
+  for(let i = 0; i < total; i++) {
+    const io = S.IOs[i];
+    const pct = Math.round(((i+1)/total)*100);
+    fillEl.style.width = pct + '%';
+    pctEl.textContent = pct + '%';
+    statEl.textContent = 'Fetching IO ' + (i+1) + ' of ' + total;
+    log('> ' + io.ioId + ' — ' + (io.ioName || ''));
+
+    if(S.tok === 'DEMO') {
+      // Use yesterday's imps as base with small jitter for realism
+      const base = io.dailyNeed || io.recommended || 5000;
+      const jitter = Math.round((Math.random() * 0.3 - 0.1) * base);
+      const currentTotal = Math.max(0, base + jitter);
+      S.live[io.ioId] = {
+        currentBudget: currentTotal,
+        segments: [{ impressionCount: String(currentTotal), dateRange: { startDate: { year:2026, month:1, day:1 }, endDate: { year:2026, month:12, day:31 } } }],
+        fetchError: null
+      };
+      S.accepted[io.ioId] = true;
+      log('  demo: current = ' + fmtN(currentTotal) + ' imps', 'log-ok');
+      await new Promise(r => setTimeout(r, 30));
+    } else if(!io.dv360AdvId) {
+      S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: 'Missing numeric DV360 Advertiser ID — add dv360_advertiser_id to BQ export' };
+      S.accepted[io.ioId] = false;
+      log('  \u26a0 skipped — no numeric DV360 Advertiser ID', 'log-warn');
+    } else {
+      try {
+        const url = 'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId;
+        const res = await fetch(url, {
+          headers: { Authorization: 'Bearer ' + S.tok }
+        });
+        const data = await res.json();
+        if(!res.ok) {
+          const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
+          S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: errMsg };
+          S.accepted[io.ioId] = false;
+          log('  \u2717 ' + errMsg, 'log-err');
+        } else {
+          const budget = data.budget || {};
+          const segments = budget.budgetSegments || [];
+          let totalImps = 0;
+          segments.forEach(seg => {
+            const imp = parseInt(seg.impressionCount || '0') || 0;
+            totalImps += imp;
+          });
+          S.live[io.ioId] = {
+            currentBudget: totalImps,
+            segments: segments,
+            fetchError: null,
+            rawBudget: budget
+          };
+          S.accepted[io.ioId] = true;
+          log('  current = ' + fmtN(totalImps) + ' imps  (' + segments.length + ' segment' + (segments.length!==1?'s':'') + ')', 'log-ok');
+        }
+      } catch(err) {
+        S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: err.message };
+        S.accepted[io.ioId] = false;
+        log('  \u2717 ' + err.message, 'log-err');
+      }
+    }
+  }
+
+  log('');
+  log('Fetch complete. ' + Object.values(S.live).filter(v=>!v.fetchError).length + ' IOs fetched successfully.', 'log-ok');
+  statEl.textContent = 'Complete';
+
+  await new Promise(r => setTimeout(r, 600));
+  goToScreen(3);
+}
+
+// ─── REVIEW ───────────────────────────────────────────────────────────────────
+function renderReview() {
+  const container = document.getElementById('review-io-cards');
+  container.innerHTML = '';
+
+  // Sort alphabetically by advertiser, then IO name
+  const sorted = [...S.IOs].sort((a,b) => {
+    const an = (a.advName||a.advId).toLowerCase();
+    const bn = (b.advName||b.advId).toLowerCase();
+    if(an !== bn) return an < bn ? -1 : 1;
+    return (a.ioName||'').toLowerCase() < (b.ioName||'').toLowerCase() ? -1 : 1;
+  });
+
+  let lastAdv = null;
+
+  sorted.forEach(io => {
+    const live    = S.live[io.ioId] || {};
+    const current = live.currentBudget;
+    const rec     = io.recommended;
+    const delta   = (current !== null && current !== undefined) ? (rec - current) : null;
+    const pctChg  = (current && current > 0 && delta !== null) ? (delta / current * 100) : null;
+    const accepted = S.accepted[io.ioId];
+
+    if((io.advName||io.advId) !== lastAdv) {
+      lastAdv = io.advName||io.advId;
+      const hd = document.createElement('div');
+      hd.className = 'adv-group-hd';
+      hd.textContent = io.advName || io.advId;
+      container.appendChild(hd);
+    }
+
+    // Insight
+    let insightClass = 'ok', insightText = '';
+    if(live.fetchError) {
+      insightClass = 'err';
+      insightText = '<strong>Fetch Error:</strong> ' + live.fetchError + ' — excluded from push.';
+    } else if(delta === null) {
+      insightClass = 'warn';
+      insightText = '<strong>No live data</strong> — cannot compare budgets.';
+    } else if(delta > 0) {
+      insightText = '<strong>Increase needed:</strong> recommended budget exceeds current by ' + fmtN(delta) + ' imps (' + (pctChg>=0?'+':'') + pctChg.toFixed(1) + '%).';
+    } else if(delta < 0) {
+      insightClass = 'warn';
+      insightText = '<strong>Decrease:</strong> recommended budget is ' + fmtN(Math.abs(delta)) + ' imps lower than current (' + pctChg.toFixed(1) + '%).';
+    } else {
+      insightText = '<strong>No change needed</strong> — current and recommended budgets match.';
+    }
+
+    const dirTag = delta === null ? '<span class="tag t-neu">unknown</span>'
+      : delta > 0 ? '<span class="tag t-inc">▲ Increase</span>'
+      : delta < 0 ? '<span class="tag t-dec">▼ Decrease</span>'
+      : '<span class="tag t-neu">= No Change</span>';
+
+    const card = document.createElement('div');
+    card.className = 'io-card' + (accepted ? '' : ' rejected');
+    card.id = 'io-card-' + io.ioId;
+
+    card.innerHTML =
+      '<div class="io-hd">' +
+        '<div class="io-hd-left">' +
+          '<div>' +
+            '<div class="io-name">' + (io.ioName || io.ioId) + '</div>' +
+            '<div class="io-id">' + io.ioId +
+              (io.startDate ? ' &nbsp;·&nbsp; ' + io.startDate + ' \u2192 ' + (io.endDate||'?') : '') +
+              (io.daysRemaining > 0 ? ' &nbsp;·&nbsp; <strong>' + io.daysRemaining + ' days left</strong>' : '') +
+            '</div>' +
+          '</div>' +
+          dirTag +
+        '</div>' +
+        '<div class="io-hd-right">' +
+          '<div class="toggle-wrap" onclick="toggleIO(\'' + io.ioId + '\')">' +
+            '<span>' + (accepted ? 'Accepted' : 'Rejected') + '</span>' +
+            '<div class="toggle' + (accepted ? ' on' : '') + '" id="toggle-' + io.ioId + '"></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="bud-grid" style="grid-template-columns:repeat(5,1fr);">' +
+        '<div class="bud-cell">' +
+          '<div class="bc-label">Yesterday Delivered</div>' +
+          '<div class="bc-val" style="font-size:20px;">' + (io.yesterdayImps > 0 ? fmtN(io.yesterdayImps) : '—') + '</div>' +
+          '<div class="bc-sub">actual imps</div>' +
+        '</div>' +
+        '<div class="bud-cell">' +
+          '<div class="bc-label">Daily Need</div>' +
+          '<div class="bc-val" style="font-size:20px;">' + (io.dailyNeed > 0 ? fmtN(io.dailyNeed) : '—') + '</div>' +
+          '<div class="bc-sub">to pace in full</div>' +
+        '</div>' +
+        '<div class="bud-cell">' +
+          '<div class="bc-label">Current Budget</div>' +
+          '<div class="bc-val" style="font-size:20px;">' + (current !== null && current !== undefined ? fmtN(current) : '—') + '</div>' +
+          '<div class="bc-sub">live from DV360</div>' +
+        '</div>' +
+        '<div class="bud-cell">' +
+          '<div class="bc-label">Proposed Budget</div>' +
+          '<div class="bc-val" style="font-size:20px;color:var(--ink);">' + fmtN(rec) + '</div>' +
+          '<div class="bc-sub">120% of daily need</div>' +
+        '</div>' +
+        '<div class="bud-cell">' +
+          '<div class="bc-label">Delta vs. Current</div>' +
+          '<div class="bc-val" style="font-size:20px;color:' + (delta===null?'var(--ink3)':delta>0?'var(--emerald)':delta<0?'var(--amber)':'var(--ink3)') + '">' +
+            (delta === null ? '—' : (delta>=0?'+':'') + fmtN(delta)) +
+          '</div>' +
+          '<div class="bc-sub">' + (pctChg !== null ? (pctChg>=0?'+':'') + pctChg.toFixed(1) + '% vs live' : 'impressions') + '</div>' +
+        '</div>' +
+      '</div>' +
+      (live.segments && live.segments.length > 1 ?
+        '<div class="io-body">' +
+          '<div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px;">' +
+            live.segments.length + ' Budget Segments (current)' +
+          '</div>' +
+          '<table class="seg-table">' +
+            '<thead><tr><th>Segment</th><th>Start</th><th>End</th><th>Current Imps</th></tr></thead>' +
+            '<tbody>' +
+              live.segments.map((seg, idx) => {
+                const imp = parseInt(seg.impressionCount||'0')||0;
+                const dr = seg.dateRange || {};
+                const s = dr.startDate ? (dr.startDate.year+'-'+String(dr.startDate.month).padStart(2,'0')+'-'+String(dr.startDate.day).padStart(2,'0')) : '—';
+                const e = dr.endDate   ? (dr.endDate.year+'-'+String(dr.endDate.month).padStart(2,'0')+'-'+String(dr.endDate.day).padStart(2,'0')) : '—';
+                return '<tr><td class="td-neutral">#' + (idx+1) + '</td><td>' + s + '</td><td>' + e + '</td><td class="td-new">' + fmtN(imp) + '</td></tr>';
+              }).join('') +
+            '</tbody>' +
+          '</table>' +
+        '</div>'
+      : '') +
+      '<div class="insight-bar ' + insightClass + '">' +
+        '<div class="ib-dot"></div>' +
+        '<div class="ib-text">' + insightText +
+          (io.yesterdayImps > 0 && io.dailyNeed > 0 ?
+            (io.yesterdayImps >= io.dailyNeed
+              ? ' &nbsp;<span style="color:var(--emerald);">Yesterday (' + fmtN(io.yesterdayImps) + ') \u2265 daily need (' + fmtN(io.dailyNeed) + ') \u2014 pacing on track.</span>'
+              : ' &nbsp;<span style="color:var(--amber);">Yesterday (' + fmtN(io.yesterdayImps) + ') &lt; daily need (' + fmtN(io.dailyNeed) + ') \u2014 under-pacing.</span>'
+            )
+          : '') +
+        '</div>' +
+      '</div>';
+
+    container.appendChild(card);
+  });
+
+  updateReviewSummary();
+}
+
+function toggleIO(ioId) {
+  S.accepted[ioId] = !S.accepted[ioId];
+  const card   = document.getElementById('io-card-' + ioId);
+  const toggle = document.getElementById('toggle-' + ioId);
+  const wrap   = toggle.parentElement;
+  const on     = S.accepted[ioId];
+  card.classList.toggle('rejected', !on);
+  toggle.classList.toggle('on', on);
+  wrap.querySelector('span').textContent = on ? 'Accepted' : 'Rejected';
+  updateReviewSummary();
+}
+
+function acceptAll() {
+  S.IOs.forEach(io => { if(!S.live[io.ioId]?.fetchError) S.accepted[io.ioId] = true; });
+  renderReview();
+}
+
+function rejectAll() {
+  S.IOs.forEach(io => { S.accepted[io.ioId] = false; });
+  renderReview();
+}
+
+function updateReviewSummary() {
+  const total    = S.IOs.length;
+  const accepted = Object.values(S.accepted).filter(Boolean).length;
+  document.getElementById('review-summary').textContent =
+    accepted + ' of ' + total + ' IOs accepted for push';
+}
+
+// ─── PUSH SCREEN ──────────────────────────────────────────────────────────────
+function renderPushScreen() {
+  const tbody = document.getElementById('push-review-tbody');
+  tbody.innerHTML = '';
+
+  const accepted = S.IOs.filter(io => S.accepted[io.ioId]);
+
+  // Group by advertiser
+  const byAdv = {};
+  accepted.forEach(io => {
+    const key = io.advName || io.advId;
+    if(!byAdv[key]) byAdv[key] = [];
+    byAdv[key].push(io);
+  });
+
+  let lastAdv = null;
+  accepted
+    .sort((a,b) => ((a.advName||a.advId) < (b.advName||b.advId) ? -1 : 1))
+    .forEach(io => {
+      const advLabel = io.advName || io.advId;
+      if(advLabel !== lastAdv) {
+        lastAdv = advLabel;
+        const row = document.createElement('tr');
+        row.className = 'adv-group-row';
+        row.innerHTML = '<td colspan="6">' + advLabel + ' &nbsp;<span style="color:var(--ink3)">' + io.advId + '</span></td>';
+        tbody.appendChild(row);
+      }
+
+      const live    = S.live[io.ioId] || {};
+      const current = live.currentBudget;
+      const rec     = io.recommended;
+      const delta   = current !== null && current !== undefined ? (rec - current) : null;
+
+      const row = document.createElement('tr');
+      row.innerHTML =
+        '<td>' +
+          '<div style="color:var(--ink);font-weight:600;">' + (io.ioName||io.ioId) + '</div>' +
+          '<div style="color:var(--ink3);font-size:9px;margin-top:2px;">' + io.ioId + '</div>' +
+        '</td>' +
+        '<td style="color:var(--ink2);">' + (io.advName||io.advId) + '</td>' +
+        '<td>' + (current !== null && current !== undefined ? fmtN(current) : '—') + '</td>' +
+        '<td style="color:var(--ink);font-weight:600;">' + fmtN(rec) + '</td>' +
+        '<td style="color:' + (delta===null?'var(--ink3)':delta>0?'var(--emerald)':delta<0?'var(--amber)':'var(--ink3)') + ';font-weight:600;">' +
+          (delta===null?'—':(delta>=0?'+':'') + fmtN(delta)) +
+        '</td>' +
+        '<td>' + (delta===null?'<span class="tag t-neu">unknown</span>':delta>0?'<span class="tag t-inc">▲ Increase</span>':delta<0?'<span class="tag t-dec">▼ Decrease</span>':'<span class="tag t-neu">= No Change</span>') + '</td>';
+      tbody.appendChild(row);
+    });
+
+  const increases = accepted.filter(io => {
+    const l = S.live[io.ioId];
+    return l && l.currentBudget !== null && io.recommended > l.currentBudget;
+  }).length;
+  const decreases = accepted.filter(io => {
+    const l = S.live[io.ioId];
+    return l && l.currentBudget !== null && io.recommended < l.currentBudget;
+  }).length;
+
+  document.getElementById('push-summary').innerHTML =
+    '<strong>' + accepted.length + ' IO' + (accepted.length!==1?'s':'') + '</strong> ready to push — ' +
+    increases + ' increase' + (increases!==1?'s':'') + ', ' +
+    decreases + ' decrease' + (decreases!==1?'s':'');
+}
+
+// ─── PUSH ─────────────────────────────────────────────────────────────────────
+async function executePush() {
+  const btn = document.getElementById('push-btn');
+  btn.disabled = true;
+
+  const logEl = document.getElementById('push-log');
+  logEl.style.display = 'block';
+  logEl.innerHTML = '<strong>Starting push...</strong><br><br>';
+
+  const pushTime    = new Date();
+  const receiptRows = [];
+  const accepted    = S.IOs.filter(io => S.accepted[io.ioId]);
+
+  for(const io of accepted) {
+    const live = S.live[io.ioId] || {};
+    logEl.innerHTML += '> ' + io.ioId + ' — ' + (io.ioName || '') + '<br>';
+
+    const sentBudget = Math.round(io.recommended);
+
+    if(S.tok === 'DEMO') {
+      await new Promise(r => setTimeout(r, 80));
+      logEl.innerHTML += '&nbsp;&nbsp;\u2192 ' + fmtN(sentBudget) + ' imps <span class="pl-ok">\u2713 demo</span><br>';
+      receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: sentBudget, status: 'OK', error: '' });
+    } else {
+      try {
+        const rawBudget = live.rawBudget || {};
+        const existingSegs = live.segments || [];
+
+        let updatedSegments;
+        if(existingSegs.length === 0) {
+          updatedSegments = [{ impressionCount: String(sentBudget) }];
+        } else if(existingSegs.length === 1) {
+          updatedSegments = [{ ...existingSegs[0], impressionCount: String(sentBudget) }];
+        } else {
+          const currentTotal = existingSegs.reduce((s, seg) => s + (parseInt(seg.impressionCount||'0')||0), 0);
+          updatedSegments = existingSegs.map(seg => {
+            const segCurrent = parseInt(seg.impressionCount||'0') || 0;
+            const weight = currentTotal > 0 ? segCurrent / currentTotal : 1 / existingSegs.length;
+            const newImp = Math.round(sentBudget * weight);
+            return { ...seg, impressionCount: String(newImp) };
+          });
+          const allocated = updatedSegments.reduce((s,seg) => s + parseInt(seg.impressionCount), 0);
+          const remainder = sentBudget - allocated;
+          if(remainder !== 0) {
+            const last = updatedSegments[updatedSegments.length-1];
+            last.impressionCount = String(parseInt(last.impressionCount) + remainder);
+          }
+        }
+
+        const patchBody = {
+          budget: {
+            budgetUnit: 'BUDGET_UNIT_IMPRESSIONS',
+            automationType: rawBudget.automationType || 'INSERTION_ORDER_AUTOMATION_TYPE_NONE',
+            budgetSegments: updatedSegments
+          }
+        };
+
+        const res = await fetch(
+          'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId + '?updateMask=budget.budgetSegments',
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: 'Bearer ' + S.tok,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(patchBody)
+          }
+        );
+        const data = await res.json();
+
+        if(res.ok) {
+          const returnedSegs = (data.budget && data.budget.budgetSegments) || [];
+          const confirmedTotal = returnedSegs.reduce((s, seg) => s + (parseInt(seg.impressionCount||'0')||0), 0);
+          const status = confirmedTotal === sentBudget ? 'OK' : 'MISMATCH';
+          logEl.innerHTML += '&nbsp;&nbsp;\u2192 ' + fmtN(sentBudget) + ' imps <span class="pl-ok">\u2713</span><br>';
+          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: confirmedTotal, status, error: '' });
+        } else {
+          const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
+          logEl.innerHTML += '&nbsp;&nbsp;<span class="pl-err">\u2717 ' + errMsg + '</span><br>';
+          receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: null, status: 'ERROR', error: errMsg });
+        }
+      } catch(err) {
+        logEl.innerHTML += '&nbsp;&nbsp;<span class="pl-err">\u2717 ' + err.message + '</span><br>';
+        receiptRows.push({ ioId: io.ioId, ioName: io.ioName, advName: io.advName, sentBudget, confirmedBudget: null, status: 'ERROR', error: err.message });
+      }
+    }
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  logEl.innerHTML += '<br><strong>Push complete.</strong>';
+  S.pushReceipt = { rows: receiptRows, time: pushTime };
+  renderPushReceipt(receiptRows, pushTime);
+  btn.disabled = false;
+}
+
+function renderPushReceipt(rows, time) {
+  const el = document.getElementById('push-receipt');
+  el.style.display = 'block';
+
+  document.getElementById('receipt-timestamp').textContent =
+    time.toLocaleDateString() + ' ' + time.toLocaleTimeString();
+
+  const ok       = rows.filter(r => r.status === 'OK').length;
+  const mismatch = rows.filter(r => r.status === 'MISMATCH').length;
+  const errors   = rows.filter(r => r.status === 'ERROR').length;
+
+  document.getElementById('receipt-summary').innerHTML =
+    '<div class="sav-met" style="flex:1;">' +
+      '<div class="sm-label">Successfully Updated</div>' +
+      '<div class="sm-val" style="color:var(--emerald);font-size:24px;">' + ok + '</div>' +
+      '<div class="sm-sub">IOs confirmed</div>' +
+    '</div>' +
+    '<div class="sav-met" style="flex:1;">' +
+      '<div class="sm-label">Mismatches</div>' +
+      '<div class="sm-val" style="color:' + (mismatch>0?'var(--amber)':'var(--ink3)') + ';font-size:24px;">' + mismatch + '</div>' +
+      '<div class="sm-sub">sent ≠ confirmed</div>' +
+    '</div>' +
+    '<div class="sav-met" style="flex:1;">' +
+      '<div class="sm-label">Errors</div>' +
+      '<div class="sm-val" style="color:' + (errors>0?'var(--coral)':'var(--ink3)') + ';font-size:24px;">' + errors + '</div>' +
+      '<div class="sm-sub">failed to update</div>' +
+    '</div>';
+
+  document.getElementById('receipt-tbody').innerHTML = rows.map(r => {
+    const statusTag = r.status === 'OK'
+      ? '<span class="tag t-ok">✓ Confirmed</span>'
+      : r.status === 'MISMATCH'
+      ? '<span class="tag t-warn">⚠ Mismatch</span>'
+      : '<span class="tag t-er">✗ Error</span>';
+
+    const confirmedCell = r.confirmedBudget !== null
+      ? '<span style="color:' + (r.confirmedBudget===r.sentBudget?'var(--emerald)':'var(--amber)') + '">' + fmtN(r.confirmedBudget) + '</span>'
+      : '<span style="color:var(--coral)">—</span>';
+
+    return '<tr>' +
+      '<td>' +
+        '<div style="color:var(--ink);font-weight:600;">' + (r.ioName||r.ioId) + '</div>' +
+        '<div style="color:var(--ink3);font-size:9px;">' + r.ioId + '</div>' +
+      '</td>' +
+      '<td style="color:var(--ink2);">' + (r.advName||r.advId) + '</td>' +
+      '<td style="font-family:var(--mono);">' + fmtN(r.sentBudget) + '</td>' +
+      '<td style="font-family:var(--mono);">' + confirmedCell + '</td>' +
+      '<td>' + statusTag + '</td>' +
+      '<td style="font-family:var(--mono);font-size:10px;color:var(--coral);">' + (r.error||'') + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ─── AUDIT CSV ────────────────────────────────────────────────────────────────
+function exportAuditCSV() {
+  const accepted = S.IOs.filter(io => S.accepted[io.ioId]);
+  const headers = 'IO_ID,IO_Name,Client,DV360_Advertiser_ID,Yesterday_Imps,Daily_Need,Current_Budget_Live,Proposed_Budget,Delta_Imps,Pct_Change,Days_Remaining,Imps_Remaining,Segments_Count\n';
+  const csv = accepted.map(io => {
+    const live    = S.live[io.ioId] || {};
+    const current = live.currentBudget !== null && live.currentBudget !== undefined ? live.currentBudget : '';
+    const rec     = io.recommended;
+    const delta   = current !== '' ? (rec - current) : '';
+    const pct     = current && current > 0 && delta !== '' ? (delta/current*100).toFixed(2)+'%' : '';
+    const segs    = (live.segments||[]).length;
+    return '"' + io.ioId + '","' + (io.ioName||'').replace(/"/g,"'") + '","' + (io.advName||'') + '","' + (io.dv360AdvId||'') + '",' + (io.yesterdayImps||'') + ',' + (io.dailyNeed||'') + ',' + current + ',' + rec + ',' + delta + ',"' + pct + '",' + (io.daysRemaining||'') + ',' + (io.impsRemaining||'') + ',' + segs;
+  }).join('\n');
+  downloadCSV('dv360_io_budget_audit_' + new Date().toISOString().split('T')[0] + '.csv', headers+csv);
+}
+</script>
+</body>
+</html>
