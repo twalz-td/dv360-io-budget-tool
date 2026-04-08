@@ -343,6 +343,37 @@ input[type=text]::placeholder{color:var(--ink4);}
   <div class="screen" id="screen-3">
     <div class="pt">Budget <strong>Review</strong></div>
     <div class="ps">Compare current vs. recommended IO budgets. Toggle off any IOs to exclude from the push.</div>
+
+    <!-- Summary card -->
+    <div id="review-summary-card" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:24px;overflow:hidden;box-shadow:var(--shadow);">
+      <div style="padding:16px 24px;background:var(--paper2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+        <span style="width:3px;height:12px;background:var(--coral);border-radius:2px;display:inline-block;"></span>
+        <span style="font-family:var(--mono);font-size:9px;font-weight:500;color:var(--ink3);letter-spacing:.14em;text-transform:uppercase;">Session Summary</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);background:var(--border);gap:1px;">
+        <div style="background:var(--white);padding:20px 24px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Eligible IOs</div>
+          <div id="sc-eligible" style="font-family:var(--display);font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--ink);line-height:1;">—</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:6px;">daily impression pacing</div>
+        </div>
+        <div style="background:var(--white);padding:20px 24px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Delivery Restricted</div>
+          <div id="sc-restricted" style="font-family:var(--display);font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--coral);line-height:1;">—</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:6px;">cap below daily need</div>
+        </div>
+        <div style="background:var(--white);padding:20px 24px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Caps to Raise</div>
+          <div id="sc-increases" style="font-family:var(--display);font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--emerald);line-height:1;">—</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:6px;">proposed &gt; current cap</div>
+        </div>
+        <div style="background:var(--white);padding:20px 24px;">
+          <div style="font-family:var(--mono);font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Caps to Lower</div>
+          <div id="sc-decreases" style="font-family:var(--display);font-size:32px;font-weight:600;letter-spacing:-.03em;color:var(--amber);line-height:1;">—</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--ink3);margin-top:6px;">proposed &lt; current cap</div>
+        </div>
+      </div>
+    </div>
+
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:24px;flex-wrap:wrap;">
       <button class="btn" onclick="acceptAll()">Accept All</button>
       <button class="btn" onclick="rejectAll()">Reject All</button>
@@ -638,17 +669,11 @@ async function startFetch() {
   }
 
   const total = S.IOs.length;
+  const BATCH = 10;
 
-  for(let i = 0; i < total; i++) {
-    const io = S.IOs[i];
-    const pct = Math.round(((i+1)/total)*100);
-    fillEl.style.width = pct + '%';
-    pctEl.textContent = pct + '%';
-    statEl.textContent = 'Fetching IO ' + (i+1) + ' of ' + total;
-    log('> ' + io.ioId + ' — ' + (io.ioName || ''));
-
+  // Per-IO fetch function — returns nothing, writes directly to S.live / S.accepted
+  async function fetchOne(io, idx) {
     if(S.tok === 'DEMO') {
-      // Use dailyNeed as base for current cap, with small jitter
       const base = io.dailyNeed || io.recommended || 2000;
       const jitter = Math.round((Math.random() * 0.3 - 0.1) * base);
       const currentCap = Math.max(0, base + jitter);
@@ -656,79 +681,95 @@ async function startFetch() {
         pacingPeriod: 'PACING_PERIOD_DAILY',
         pacingType:   'PACING_TYPE_EVEN',
         dailyMaxImpressions: currentCap,
-        isDaily:      true,
-        fetchError:   null,
-        rawPacing:    { pacingPeriod: 'PACING_PERIOD_DAILY', pacingType: 'PACING_TYPE_EVEN', dailyMaxImpressions: String(currentCap) }
+        isDaily: true,
+        isCurrencyBudget: false,
+        fetchError: null,
+        rawPacing: { pacingPeriod: 'PACING_PERIOD_DAILY', pacingType: 'PACING_TYPE_EVEN', dailyMaxImpressions: String(currentCap) }
       };
       S.accepted[io.ioId] = true;
-      log('  demo: dailyCap = ' + fmtN(currentCap) + '  period: DAILY  type: EVEN', 'log-ok');
-      await new Promise(r => setTimeout(r, 30));
-    } else if(!io.dv360AdvId) {
-      S.live[io.ioId] = { currentBudget: null, segments: [], fetchError: 'Missing numeric DV360 Advertiser ID — add dv360_advertiser_id to BQ export' };
+      log('  ' + io.ioId + ': dailyMaxImpressions = ' + fmtN(currentCap), 'log-ok');
+      await new Promise(r => setTimeout(r, 20));
+      return;
+    }
+
+    if(!io.dv360AdvId) {
+      S.live[io.ioId] = { fetchError: 'Missing numeric DV360 Advertiser ID' };
       S.accepted[io.ioId] = false;
-      log('  \u26a0 skipped — no numeric DV360 Advertiser ID', 'log-warn');
-    } else {
-      try {
-        const url = 'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId;
-        const res = await fetch(url, {
-          headers: { Authorization: 'Bearer ' + S.tok }
-        });
-        const data = await res.json();
-        if(!res.ok) {
-          const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
-          S.live[io.ioId] = { fetchError: errMsg };
-          S.accepted[io.ioId] = false;
-          log('  \u2717 ' + errMsg, 'log-err');
-        } else {
-          const pacing = data.pacing || {};
-          const pacingPeriod        = pacing.pacingPeriod || '';
-          const pacingType          = pacing.pacingType   || '';
-          const dailyMaxImpressions = parseInt(pacing.dailyMaxImpressions || '0') || 0;
-          const isDaily             = pacingPeriod === 'PACING_PERIOD_DAILY';
+      log('  ' + io.ioId + ': \u26a0 skipped — no Advertiser ID', 'log-warn');
+      return;
+    }
 
-          // Diagnostic: log raw pacing object for first IO
-          if(i === 0) {
-            log('  [diag] raw pacing: ' + JSON.stringify(pacing), 'log-warn');
-          }
+    try {
+      const url = 'https://displayvideo.googleapis.com/v4/advertisers/' + io.dv360AdvId + '/insertionOrders/' + io.ioId;
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + S.tok } });
+      const data = await res.json();
 
-          S.live[io.ioId] = {
-            pacingPeriod,
-            pacingType,
-            dailyMaxImpressions,
-            isDaily,
-            fetchError: null,
-            rawPacing: pacing
-          };
-
-          // Auto-accept only if pacing period is daily
-          S.accepted[io.ioId] = isDaily;
-
-          const periodLabel = pacingPeriod.replace('PACING_PERIOD_','').toLowerCase();
-          const typeLabel   = pacingType.replace('PACING_TYPE_','').toLowerCase();
-          if(!isDaily) {
-            log('  \u26a0 pacing period: ' + periodLabel + ' (not daily \u2014 excluded from push)', 'log-warn');
-          } else if(typeLabel === 'asap') {
-            log('  \u26a0 dailyMaxImpressions = ' + fmtN(dailyMaxImpressions) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-warn');
-          } else {
-            log('  dailyMaxImpressions = ' + fmtN(dailyMaxImpressions) + '  period: ' + periodLabel + '  type: ' + typeLabel, 'log-ok');
-          }
-        }
-      } catch(err) {
-        S.live[io.ioId] = { fetchError: err.message };
+      if(!res.ok) {
+        const errMsg = (data.error && data.error.message) || (res.status + ' ' + res.statusText);
+        S.live[io.ioId] = { fetchError: errMsg };
         S.accepted[io.ioId] = false;
-        log('  \u2717 ' + err.message, 'log-err');
+        log('  ' + io.ioId + ': \u2717 ' + errMsg, 'log-err');
+        return;
       }
+
+      const pacing              = data.pacing || {};
+      const pacingPeriod        = pacing.pacingPeriod || '';
+      const pacingType          = pacing.pacingType   || '';
+      const dailyMaxImpressions = parseInt(pacing.dailyMaxImpressions || '0') || 0;
+      const isDaily             = pacingPeriod === 'PACING_PERIOD_DAILY';
+      // Currency budget: has dailyMaxMicros but no dailyMaxImpressions
+      const isCurrencyBudget    = !!(pacing.dailyMaxMicros && !pacing.dailyMaxImpressions);
+
+      S.live[io.ioId] = {
+        pacingPeriod,
+        pacingType,
+        dailyMaxImpressions,
+        isDaily,
+        isCurrencyBudget,
+        fetchError: null,
+        rawPacing: pacing
+      };
+
+      // Auto-accept only if daily pacing period AND impression budget
+      S.accepted[io.ioId] = isDaily && !isCurrencyBudget;
+
+      const periodLabel = pacingPeriod.replace('PACING_PERIOD_','').toLowerCase();
+      const typeLabel   = pacingType.replace('PACING_TYPE_','').toLowerCase();
+
+      if(!isDaily) {
+        log('  ' + io.ioId + ': \u26a0 ' + periodLabel + ' pacing — excluded', 'log-warn');
+      } else if(isCurrencyBudget) {
+        log('  ' + io.ioId + ': \u26a0 currency budget (dailyMaxMicros) — excluded', 'log-warn');
+      } else {
+        log('  ' + io.ioId + ': dailyMaxImpressions = ' + fmtN(dailyMaxImpressions) + '  type: ' + typeLabel, 'log-ok');
+      }
+    } catch(err) {
+      S.live[io.ioId] = { fetchError: err.message };
+      S.accepted[io.ioId] = false;
+      log('  ' + io.ioId + ': \u2717 ' + err.message, 'log-err');
     }
   }
 
-  const fetchResults = Object.values(S.live);
-  const fetchOk      = fetchResults.filter(v => !v.fetchError).length;
-  const fetchNonDaily = fetchResults.filter(v => !v.fetchError && !v.isDaily).length;
-  const fetchErr     = fetchResults.filter(v => v.fetchError).length;
+  // Process in batches of BATCH concurrent requests
+  for(let i = 0; i < total; i += BATCH) {
+    const chunk = S.IOs.slice(i, i + BATCH);
+    await Promise.allSettled(chunk.map((io, j) => fetchOne(io, i + j)));
+    const done = Math.min(i + BATCH, total);
+    fillEl.style.width = Math.round(done / total * 100) + '%';
+    pctEl.textContent  = Math.round(done / total * 100) + '%';
+    statEl.textContent = 'Fetched ' + done + ' of ' + total;
+  }
+
+  const fetchResults      = Object.values(S.live);
+  const fetchOk           = fetchResults.filter(v => !v.fetchError && v.isDaily && !v.isCurrencyBudget).length;
+  const fetchNonDaily     = fetchResults.filter(v => !v.fetchError && !v.isDaily).length;
+  const fetchCurrency     = fetchResults.filter(v => !v.fetchError && v.isDaily && v.isCurrencyBudget).length;
+  const fetchErr          = fetchResults.filter(v => v.fetchError).length;
   log('');
-  log('Fetch complete. ' + fetchOk + ' IOs fetched' +
-    (fetchNonDaily > 0 ? ' \u2014 \u26a0 ' + fetchNonDaily + ' excluded (non-daily pacing)' : '') +
-    (fetchErr > 0 ? ' \u2014 \u2717 ' + fetchErr + ' errors' : '') + '.', 'log-ok');
+  log('Fetch complete. ' + fetchOk + ' IOs ready to push' +
+    (fetchNonDaily > 0 ? ' \u2014 \u26a0 ' + fetchNonDaily + ' non-daily excluded' : '') +
+    (fetchCurrency > 0 ? ' \u2014 \u26a0 ' + fetchCurrency + ' currency budget excluded' : '') +
+    (fetchErr > 0      ? ' \u2014 \u2717 ' + fetchErr + ' errors' : '') + '.', 'log-ok');
   statEl.textContent = 'Complete';
 
   await new Promise(r => setTimeout(r, 600));
@@ -739,6 +780,18 @@ async function startFetch() {
 function renderReview() {
   const container = document.getElementById('review-io-cards');
   container.innerHTML = '';
+
+  // ── Summary card ──────────────────────────────────────────────────────────
+  const eligible   = S.IOs.filter(io => { const l = S.live[io.ioId]||{}; return l.isDaily && !l.isCurrencyBudget && !l.fetchError; });
+  const restricted = eligible.filter(io => { const l = S.live[io.ioId]||{}; return io.dailyNeed > 0 && l.dailyMaxImpressions > 0 && io.dailyNeed > l.dailyMaxImpressions; });
+  const increases  = eligible.filter(io => { const l = S.live[io.ioId]||{}; return io.recommended > l.dailyMaxImpressions; });
+  const decreases  = eligible.filter(io => { const l = S.live[io.ioId]||{}; return io.recommended < l.dailyMaxImpressions; });
+
+  document.getElementById('sc-eligible').textContent   = eligible.length;
+  document.getElementById('sc-restricted').textContent = restricted.length;
+  document.getElementById('sc-increases').textContent  = increases.length;
+  document.getElementById('sc-decreases').textContent  = decreases.length;
+  document.getElementById('review-summary-card').style.display = 'block';
 
   // Sort alphabetically by client name, then IO name
   const sorted = [...S.IOs].sort((a,b) => {
@@ -781,7 +834,10 @@ function renderReview() {
       insightText = '<strong>Fetch Error:</strong> ' + live.fetchError + ' — excluded from push.';
     } else if(!isDaily) {
       insightClass = 'warn';
-      insightText = '<strong>Pacing period is ' + periodLabel + ', not DAILY</strong> — this IO is excluded from push. Verify in DV360 before proceeding.';
+      insightText = '<strong>Pacing period is ' + periodLabel + ', not DAILY</strong> — excluded from push.';
+    } else if(live.isCurrencyBudget) {
+      insightClass = 'warn';
+      insightText = '<strong>Currency budget (dailyMaxMicros)</strong> — this IO uses a dollar daily cap, not impressions. Excluded from push.';
     } else if(delta === null) {
       insightClass = 'warn';
       insightText = '<strong>No live pacing data</strong> — cannot compare.';
@@ -808,8 +864,8 @@ function renderReview() {
       : delta < 0 ? '<span class="tag t-dec">\u25bc Decrease</span>'
       : '<span class="tag t-neu">= No Change</span>';
 
-    // Toggle disabled for non-daily IOs
-    const toggleDisabled = !isDaily || !!live.fetchError;
+    // Toggle disabled for non-daily or currency budget IOs
+    const toggleDisabled = !isDaily || !!live.fetchError || !!live.isCurrencyBudget;
 
     const card = document.createElement('div');
     card.className = 'io-card' + (accepted ? '' : ' rejected');
@@ -902,7 +958,10 @@ function toggleIO(ioId) {
 }
 
 function acceptAll() {
-  S.IOs.forEach(io => { if(!S.live[io.ioId]?.fetchError) S.accepted[io.ioId] = true; });
+  S.IOs.forEach(io => {
+    const live = S.live[io.ioId] || {};
+    if(live.isDaily && !live.isCurrencyBudget && !live.fetchError) S.accepted[io.ioId] = true;
+  });
   renderReview();
 }
 
@@ -912,10 +971,10 @@ function rejectAll() {
 }
 
 function updateReviewSummary() {
-  const total    = S.IOs.length;
-  const accepted = Object.values(S.accepted).filter(Boolean).length;
+  const eligible = S.IOs.filter(io => { const l = S.live[io.ioId]||{}; return l.isDaily && !l.isCurrencyBudget && !l.fetchError; }).length;
+  const accepted = S.IOs.filter(io => S.accepted[io.ioId]).length;
   document.getElementById('review-summary').textContent =
-    accepted + ' of ' + total + ' IOs accepted for push';
+    accepted + ' of ' + eligible + ' eligible IOs accepted for push';
 }
 
 // ─── PUSH SCREEN ──────────────────────────────────────────────────────────────
