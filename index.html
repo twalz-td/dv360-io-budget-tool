@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TravelDesk — DV360 INSERTION ORDER BUDGET MANAGEMENT</title>
+<title>TravelDesk — DV360 IO Budget Optimizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
@@ -250,7 +250,7 @@ input[type=text]::placeholder{color:var(--ink4);}
     <img id="header-logo" src="https://traveldeskglobal.com/wp-content/uploads/2024/03/TD-Logo-White.png" style="filter:invert(1) sepia(1) saturate(0) brightness(0.2)" alt="TravelDesk" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
     <div id="logo-fallback" style="display:none;" class="la-fallback">TravelDesk</div>
     <div class="ld"></div>
-    <span class="lapp">DV360 INSERTION ORDER BUDGET MANAGEMENT</span>
+    <span class="lapp">DV360 IO Budget Optimizer</span>
   </div>
   <div class="snav">
     <div class="si active" data-step="0"><div class="snum">1</div><span>Connect</span></div>
@@ -341,8 +341,17 @@ input[type=text]::placeholder{color:var(--ink4);}
 
   <!-- SCREEN 3: REVIEW -->
   <div class="screen" id="screen-3">
-    <div class="pt">Budget <strong>Review</strong></div>
-    <div class="ps">Compare current vs. recommended IO budgets. Toggle off any IOs to exclude from the push.</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+      <div>
+        <div class="pt">Budget <strong>Review</strong></div>
+        <div class="ps" style="margin-bottom:0;">Compare current vs. recommended IO budgets. Toggle off any IOs to exclude from the push.</div>
+      </div>
+      <button class="btn" style="margin-top:8px;flex-shrink:0;" onclick="document.getElementById('review-bottom').scrollIntoView({behavior:'smooth'})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        Scroll to Bottom
+      </button>
+    </div>
+    <div style="height:32px;"></div>
 
     <!-- Summary card -->
     <div id="review-summary-card" style="display:none;background:var(--white);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:24px;overflow:hidden;box-shadow:var(--shadow);">
@@ -374,14 +383,45 @@ input[type=text]::placeholder{color:var(--ink4);}
       </div>
     </div>
 
+    <!-- Filter + action bar -->
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:24px;flex-wrap:wrap;">
       <button class="btn" onclick="acceptAll()">Accept All</button>
       <button class="btn" onclick="rejectAll()">Reject All</button>
+
+      <!-- Advertiser filter -->
+      <div style="position:relative;" id="adv-filter-wrap">
+        <button class="btn" onclick="toggleAdvFilter()" id="adv-filter-btn" style="gap:8px;min-width:180px;justify-content:space-between;">
+          <span id="adv-filter-label">All Clients</span>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div id="adv-filter-dropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:280px;background:var(--white);border:1.5px solid var(--border2);border-radius:var(--rl);box-shadow:var(--shadow-lg);z-index:200;overflow:hidden;">
+          <!-- Search -->
+          <div style="padding:10px 12px;border-bottom:1px solid var(--border);">
+            <input type="text" id="adv-search" placeholder="Search clients..." oninput="filterAdvList()" style="margin-bottom:0;font-size:11px;padding:7px 10px;">
+          </div>
+          <!-- Select all / deselect all -->
+          <div style="display:flex;gap:0;border-bottom:1px solid var(--border);">
+            <button onclick="advSelectAll()" style="flex:1;padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--coral);background:none;border:none;cursor:pointer;font-weight:600;letter-spacing:.04em;">Select All</button>
+            <div style="width:1px;background:var(--border);"></div>
+            <button onclick="advDeselectAll()" style="flex:1;padding:8px 12px;font-family:var(--mono);font-size:10px;color:var(--ink3);background:none;border:none;cursor:pointer;font-weight:600;letter-spacing:.04em;">Deselect All</button>
+          </div>
+          <!-- Checkboxes -->
+          <div id="adv-filter-list" style="max-height:260px;overflow-y:auto;padding:6px 0;"></div>
+        </div>
+      </div>
+
       <div style="flex:1;"></div>
       <div id="review-summary" style="font-family:var(--mono);font-size:11px;color:var(--ink3);"></div>
     </div>
+
     <div id="review-io-cards"></div>
-    <div class="row-actions">
+
+    <!-- Bottom anchor -->
+    <div id="review-bottom" style="display:flex;justify-content:space-between;align-items:center;padding-top:16px;">
+      <button class="btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        Scroll to Top
+      </button>
       <button class="btn bp" onclick="goToScreen(4)">
         Proceed to Push
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -391,8 +431,16 @@ input[type=text]::placeholder{color:var(--ink4);}
 
   <!-- SCREEN 4: PUSH -->
   <div class="screen" id="screen-4">
-    <div class="pt">Push to <strong>DV360</strong></div>
-    <div class="ps">Final review of accepted IO budget updates before committing to the API.</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;">
+      <div>
+        <div class="pt">Push to <strong>DV360</strong></div>
+        <div class="ps" style="margin-bottom:0;">Final review of accepted IO budget updates before committing to the API.</div>
+      </div>
+      <button class="btn" style="margin-top:8px;flex-shrink:0;" onclick="document.getElementById('push-bottom').scrollIntoView({behavior:'smooth'})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        Scroll to Bottom
+      </button>
+    </div>
 
     <div class="card" style="margin-bottom:20px;">
       <div class="ct">Accepted IO Updates — Pre-Push Review</div>
@@ -454,9 +502,13 @@ input[type=text]::placeholder{color:var(--ink4);}
         </div>
       </div>
     </div>
+    <div id="push-bottom" style="display:flex;justify-content:flex-start;padding-top:16px;">
+      <button class="btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        Scroll to Top
+      </button>
+    </div>
   </div>
-
-</main>
 
 <script>
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -655,6 +707,7 @@ async function startFetch() {
   goToScreen(2);
   S.live = {};
   S.accepted = {};
+  S.advFilter = null;
 
   const logEl  = document.getElementById('fetch-log');
   const fillEl = document.getElementById('fetch-fill');
@@ -776,10 +829,89 @@ async function startFetch() {
   goToScreen(3);
 }
 
+// ─── ADVERTISER FILTER ────────────────────────────────────────────────────────
+// S.advFilter: Set of advName strings currently selected (null = all selected)
+S.advFilter = null;
+
+function initAdvFilter() {
+  // Build sorted unique list of client names
+  const names = [...new Set(S.IOs.map(io => io.advName || io.dv360AdvId || '').filter(Boolean))].sort();
+  S.advFilter = new Set(names); // start with all selected
+  renderAdvList(names);
+}
+
+function renderAdvList(names) {
+  const list = document.getElementById('adv-filter-list');
+  if(!list) return;
+  list.innerHTML = names.map(name => {
+    const checked = S.advFilter && S.advFilter.has(name);
+    const ioCount = S.IOs.filter(io => (io.advName||io.dv360AdvId||'') === name).length;
+    return '<label style="display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .12s;" onmouseover="this.style.background=\'var(--paper2)\'" onmouseout="this.style.background=\'\'">'+
+      '<input type="checkbox" ' + (checked ? 'checked' : '') + ' onchange="toggleAdvFilter_item(this,\'' + name.replace(/'/g,"\\'") + '\')" style="accent-color:var(--coral);width:14px;height:14px;flex-shrink:0;">'+
+      '<span style="font-family:var(--mono);font-size:11px;color:var(--ink);flex:1;">' + name + '</span>'+
+      '<span style="font-family:var(--mono);font-size:9px;color:var(--ink4);">' + ioCount + ' IO' + (ioCount!==1?'s':'') + '</span>'+
+    '</label>';
+  }).join('');
+  updateAdvFilterLabel();
+}
+
+function toggleAdvFilter() {
+  const dd = document.getElementById('adv-filter-dropdown');
+  const isOpen = dd.style.display !== 'none';
+  dd.style.display = isOpen ? 'none' : 'block';
+  if(!isOpen) document.getElementById('adv-search').focus();
+}
+
+function toggleAdvFilter_item(cb, name) {
+  if(cb.checked) S.advFilter.add(name);
+  else S.advFilter.delete(name);
+  updateAdvFilterLabel();
+  renderReview();
+}
+
+function filterAdvList() {
+  const q = document.getElementById('adv-search').value.toLowerCase();
+  const all = [...new Set(S.IOs.map(io => io.advName || io.dv360AdvId || '').filter(Boolean))].sort();
+  const filtered = q ? all.filter(n => n.toLowerCase().includes(q)) : all;
+  renderAdvList(filtered);
+}
+
+function advSelectAll() {
+  const all = [...new Set(S.IOs.map(io => io.advName || io.dv360AdvId || '').filter(Boolean))];
+  all.forEach(n => S.advFilter.add(n));
+  filterAdvList();
+  renderReview();
+}
+
+function advDeselectAll() {
+  S.advFilter.clear();
+  filterAdvList();
+  renderReview();
+}
+
+function updateAdvFilterLabel() {
+  const total = new Set(S.IOs.map(io => io.advName||io.dv360AdvId||'').filter(Boolean)).size;
+  const selected = S.advFilter ? S.advFilter.size : total;
+  const lbl = document.getElementById('adv-filter-label');
+  if(lbl) lbl.textContent = selected === total ? 'All Clients' : selected === 0 ? 'No Clients' : selected + ' of ' + total + ' Clients';
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('adv-filter-wrap');
+  if(wrap && !wrap.contains(e.target)) {
+    const dd = document.getElementById('adv-filter-dropdown');
+    if(dd) dd.style.display = 'none';
+  }
+});
+
 // ─── REVIEW ───────────────────────────────────────────────────────────────────
 function renderReview() {
   const container = document.getElementById('review-io-cards');
   container.innerHTML = '';
+
+  // Init filter on first render
+  if(!S.advFilter) initAdvFilter();
 
   // ── Summary card ──────────────────────────────────────────────────────────
   const eligible   = S.IOs.filter(io => { const l = S.live[io.ioId]||{}; return l.isDaily && !l.isCurrencyBudget && !l.fetchError; });
@@ -793,13 +925,15 @@ function renderReview() {
   document.getElementById('sc-decreases').textContent  = decreases.length;
   document.getElementById('review-summary-card').style.display = 'block';
 
-  // Sort alphabetically by client name, then IO name
-  const sorted = [...S.IOs].sort((a,b) => {
-    const an = (a.advName||a.dv360AdvId||'').toLowerCase();
-    const bn = (b.advName||b.dv360AdvId||'').toLowerCase();
-    if(an !== bn) return an < bn ? -1 : 1;
-    return (a.ioName||'').toLowerCase() < (b.ioName||'').toLowerCase() ? -1 : 1;
-  });
+  // Sort alphabetically by client name, then IO name — apply advertiser filter
+  const sorted = [...S.IOs]
+    .filter(io => !S.advFilter || S.advFilter.has(io.advName||io.dv360AdvId||''))
+    .sort((a,b) => {
+      const an = (a.advName||a.dv360AdvId||'').toLowerCase();
+      const bn = (b.advName||b.dv360AdvId||'').toLowerCase();
+      if(an !== bn) return an < bn ? -1 : 1;
+      return (a.ioName||'').toLowerCase() < (b.ioName||'').toLowerCase() ? -1 : 1;
+    });
 
   let lastAdv = null;
 
@@ -958,15 +1092,19 @@ function toggleIO(ioId) {
 }
 
 function acceptAll() {
-  S.IOs.forEach(io => {
-    const live = S.live[io.ioId] || {};
-    if(live.isDaily && !live.isCurrencyBudget && !live.fetchError) S.accepted[io.ioId] = true;
-  });
+  S.IOs
+    .filter(io => !S.advFilter || S.advFilter.has(io.advName||io.dv360AdvId||''))
+    .forEach(io => {
+      const live = S.live[io.ioId] || {};
+      if(live.isDaily && !live.isCurrencyBudget && !live.fetchError) S.accepted[io.ioId] = true;
+    });
   renderReview();
 }
 
 function rejectAll() {
-  S.IOs.forEach(io => { S.accepted[io.ioId] = false; });
+  S.IOs
+    .filter(io => !S.advFilter || S.advFilter.has(io.advName||io.dv360AdvId||''))
+    .forEach(io => { S.accepted[io.ioId] = false; });
   renderReview();
 }
 
